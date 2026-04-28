@@ -1,0 +1,7 @@
+ai:
+  provider:
+  base_url:
+  api_key_env:
+  model:
+  timeout_ms:
+  max_retries:
