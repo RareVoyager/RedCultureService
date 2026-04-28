@@ -27,6 +27,7 @@ target_include_directories(redculture_service
 target_link_libraries(redculture_service
     PUBLIC
         ${RCS_BOOST_TARGET}
+        jwt-cpp::jwt-cpp
         spdlog::spdlog_header_only
         nlohmann_json::nlohmann_json
         yaml-cpp::yaml-cpp
