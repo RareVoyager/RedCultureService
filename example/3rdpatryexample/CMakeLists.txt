@@ -32,7 +32,7 @@ function(rcs_add_3rdparty_example target file)
 endfunction()
 
 rcs_add_3rdparty_example(test_boost test_boost.cpp)
-target_link_libraries(test_boost PRIVATE Boost::headers)
+target_link_libraries(test_boost PRIVATE ${RCS_BOOST_TARGET})
 
 rcs_add_3rdparty_example(test_spdlog test_spdlog.cpp)
 target_link_libraries(test_spdlog PRIVATE spdlog::spdlog_header_only)

@@ -4,6 +4,9 @@ add_library(RedCulture::service ALIAS redculture_service)
 target_sources(redculture_service
     PRIVATE
         common/service.cpp
+        net/message.cpp
+        net/rate_limiter.cpp
+        net/tcp_connection.cpp
         net/network_gateway.cpp
         auth/session_auth_service.cpp
         room/room_match_service.cpp
@@ -23,6 +26,7 @@ target_include_directories(redculture_service
 
 target_link_libraries(redculture_service
     PUBLIC
+        ${RCS_BOOST_TARGET}
         spdlog::spdlog_header_only
         nlohmann_json::nlohmann_json
         yaml-cpp::yaml-cpp
