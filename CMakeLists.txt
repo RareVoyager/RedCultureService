@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(RCS_WITH_GRPC "Enable gRPC related dependencies" ON)
 option(RCS_BUILD_EXAMPLES "Build example binaries" ON)
 option(RCS_BUILD_TESTS "Build tests" OFF)
+option(RCS_BUILD_SERVER "Build red culture HTTP server" ON)
 
 find_package(Boost CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -24,6 +25,7 @@ find_package(ZLIB CONFIG REQUIRED)
 find_package(prometheus-cpp CONFIG REQUIRED)
 find_package(jwt-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 set(RCS_BOOST_TARGET "")
 if(TARGET Boost::headers)
@@ -55,7 +57,39 @@ if(RCS_WITH_GRPC)
     find_package(gRPC CONFIG REQUIRED)
 endif()
 
+add_library(redculture_common INTERFACE)
+add_library(RedCulture::common ALIAS redculture_common)
+
+set(RCS_COMMON_HEADERS
+    ${PROJECT_SOURCE_DIR}/include/rcs/common/result.hpp
+)
+
+foreach(RCS_COMMON_HEADER IN LISTS RCS_COMMON_HEADERS)
+    if(NOT EXISTS ${RCS_COMMON_HEADER})
+        message(FATAL_ERROR "Missing common header: ${RCS_COMMON_HEADER}")
+    endif()
+endforeach()
+
+target_sources(redculture_common
+    INTERFACE
+        ${RCS_COMMON_HEADERS}
+)
+
+target_include_directories(redculture_common
+    INTERFACE
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_compile_features(redculture_common
+    INTERFACE
+        cxx_std_17
+)
+
 add_subdirectory(src)
+
+if(RCS_BUILD_SERVER)
+    add_subdirectory(app)
+endif()
 
 if(RCS_BUILD_EXAMPLES)
     add_subdirectory(example)

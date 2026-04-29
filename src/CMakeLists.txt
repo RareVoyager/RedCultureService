@@ -4,6 +4,11 @@ add_library(RedCulture::service ALIAS redculture_service)
 target_sources(redculture_service
     PRIVATE
         common/service.cpp
+        http/http_types.cpp
+        http/http_router.cpp
+        http/http_server.cpp
+        application/api_routes.cpp
+        application/service_application.cpp
         net/message.cpp
         net/rate_limiter.cpp
         net/tcp_connection.cpp
@@ -13,6 +18,7 @@ target_sources(redculture_service
         sync/state_sync_service.cpp
         ai_orchestrator/ai_orchestrator_service.cpp
         voice_tts/voice_tts_service.cpp
+        gameplay/cultural_interaction_service.cpp
         storage/storage_service.cpp
         config_hotreload/config_hotreload_service.cpp
         observability/telemetry_service.cpp
@@ -26,12 +32,14 @@ target_include_directories(redculture_service
 
 target_link_libraries(redculture_service
     PUBLIC
+        RedCulture::common
         ${RCS_BOOST_TARGET}
         ${RCS_PQXX_TARGET}
         jwt-cpp::jwt-cpp
         spdlog::spdlog_header_only
         nlohmann_json::nlohmann_json
         yaml-cpp::yaml-cpp
+        Threads::Threads
 )
 
 if(RCS_WITH_GRPC)

@@ -9,6 +9,9 @@ add_subdirectory(storage_example)
 add_subdirectory(config_hotreload_example)
 add_subdirectory(observability_example)
 add_subdirectory(ops_example)
+add_subdirectory(http_api_example)
+add_subdirectory(gameplay_example)
+add_subdirectory(common_result_example)
 
 add_executable(rcs_example
     main.cpp
