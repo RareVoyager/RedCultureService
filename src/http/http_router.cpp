@@ -1,5 +1,7 @@
 #include "rcs/http/http_router.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cctype>
 #include <mutex>
@@ -39,12 +41,24 @@ HttpResponse HttpRouter::route(const HttpRequest& request) const
 
     const auto path_it = routes_.find(request.path);
     if (path_it == routes_.end()) {
+        spdlog::warn("http_route_not_found location={}:{} method={} path={} target={}",
+                     __FILE__,
+                     __LINE__,
+                     request.method,
+                     request.path,
+                     request.target);
         return HttpResponse::not_found();
     }
 
     const auto method = normalize_method(request.method);
     const auto handler_it = path_it->second.find(method);
     if (handler_it == path_it->second.end()) {
+        spdlog::warn("http_method_not_allowed location={}:{} method={} path={} target={}",
+                     __FILE__,
+                     __LINE__,
+                     request.method,
+                     request.path,
+                     request.target);
         return HttpResponse::text(405, "method not allowed");
     }
 

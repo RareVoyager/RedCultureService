@@ -181,8 +181,17 @@ private:
             try {
                 response = router_->route(to_http_request(request, remote_endpoint));
             } catch (const std::exception& ex) {
+                spdlog::error("http_handler_exception location={}:{} function={} msg={}",
+                              __FILE__,
+                              __LINE__,
+                              __func__,
+                              ex.what());
                 response = HttpResponse::internal_error(ex.what());
             } catch (...) {
+                spdlog::error("http_handler_exception location={}:{} function={} msg=unknown server error",
+                              __FILE__,
+                              __LINE__,
+                              __func__);
                 response = HttpResponse::internal_error("unknown server error");
             }
         }

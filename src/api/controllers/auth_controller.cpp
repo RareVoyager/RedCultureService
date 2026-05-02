@@ -91,10 +91,11 @@ void AuthController::register_routes(http::HttpRouter& router)
 {
     auto self = shared_from_this();
 
-    // 注册和登录都放在 API 层，app 只负责启动进程和挂载路由�?    router.post("/api/v1/auth/register", [self](const http::HttpRequest& request) {
+    // 注册和登录都放在 API 层，app 只负责启动进程和挂载路由。
+    router.post("/api/v1/auth/register", [self](const http::HttpRequest& request) {
         return self->register_user(request);
     });
-    router.post("/api/v1/auth/login",  [self](const http::HttpRequest& request) {
+    router.post("/api/v1/auth/login", [self](const http::HttpRequest& request) {
         return self->login(request);
     });
 }

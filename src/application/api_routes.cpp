@@ -653,11 +653,11 @@ void register_api_routes(http::HttpRouter& router, std::shared_ptr<ServiceContex
         });
     });
 
-    auth_controller->register_routes(router);
-
     router.post("/api/v1/auth/login", [context](const http::HttpRequest& request) {
         return handle_login(request, context);
     });
+
+    auth_controller->register_routes(router);
 
     router.post("/api/v1/rooms/create", [context](const http::HttpRequest& request) {
         return handle_create_room(request, context);
