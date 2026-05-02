@@ -38,6 +38,8 @@ class RedCultureServiceConan(ConanFile):
         self.requires("yaml-cpp/0.8.0")
         self.requires("openssl/3.3.2")
         self.requires("zlib/1.3.1")
+        if self.settings.os == "Linux":
+            self.requires("libxcrypt/4.4.36")
 
         # --- 数据与缓存 ---
         self.requires("redis-plus-plus/1.3.10")

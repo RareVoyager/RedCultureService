@@ -7,12 +7,20 @@ target_sources(redculture_service
         http/http_types.cpp
         http/http_router.cpp
         http/http_server.cpp
+        api/http_utils.cpp
+        api/server_routes.cpp
+        api/controllers/auth_controller.cpp
+        api/controllers/interaction_controller.cpp
+        api/controllers/ops_controller.cpp
+        api/controllers/room_controller.cpp
+        api/controllers/tts_controller.cpp
         application/api_routes.cpp
         application/service_application.cpp
         net/message.cpp
         net/rate_limiter.cpp
         net/tcp_connection.cpp
         net/network_gateway.cpp
+        auth/password_hasher.cpp
         auth/session_auth_service.cpp
         room/room_match_service.cpp
         sync/state_sync_service.cpp
@@ -41,6 +49,13 @@ target_link_libraries(redculture_service
         yaml-cpp::yaml-cpp
         Threads::Threads
 )
+
+if(RCS_LIBXCRYPT_TARGET)
+    target_link_libraries(redculture_service
+        PUBLIC
+            ${RCS_LIBXCRYPT_TARGET}
+    )
+endif()
 
 if(RCS_WITH_GRPC)
     target_link_libraries(redculture_service

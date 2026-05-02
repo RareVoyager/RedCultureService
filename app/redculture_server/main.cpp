@@ -1,6 +1,6 @@
 #include "rcs/application/service_application.hpp"
 
-#include "app/redculture_server/server_routes.hpp"
+#include "rcs/api/server_routes.hpp"
 
 #include <boost/asio.hpp>
 
@@ -75,7 +75,7 @@ int main(int argc, char** argv)
         apply_cli_args(argc, argv, config);
 
         rcs::application::ServiceApplication app(config);
-        rcs::server::register_server_routes(*app.router(), app.context());
+        rcs::api::register_server_routes(*app.router(), app.context());
         app.start();
 
         std::cout << "RedCultureService HTTP server started at http://"

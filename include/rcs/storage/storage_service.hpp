@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +11,7 @@
 namespace rcs::storage {
 
 struct StorageConfig {
-    // PostgreSQL 连接串。生产环境建议由 config_hotreload 模块从配置文件或环境变量注入。
+    // PostgreSQL 连接串。生产环境建议由配置文件或环境变量注入。
     std::string connection_uri{"postgresql://postgres:postgres@127.0.0.1:5432/redculture"};
 
     // 连接成功后是否自动创建基础表结构。
@@ -32,7 +32,11 @@ struct InsertResult {
 struct UserProfile {
     std::string player_id;
     std::string account;
+    std::string password_hash;
     std::string display_name;
+    std::string avatar_url;
+    std::string role{"player"};
+    std::string status{"active"};
     nlohmann::json metadata = nlohmann::json::object();
 };
 
@@ -83,8 +87,10 @@ public:
     // 创建 PostgreSQL 基础表结构，支持重复执行。
     StorageResult migrate();
 
+    StorageResult create_user(const UserProfile& profile);
     StorageResult upsert_user(const UserProfile& profile);
     std::optional<UserProfile> find_user(const std::string& player_id) const;
+    std::optional<UserProfile> find_user_by_account(const std::string& account) const;
 
     InsertResult append_answer_record(const AnswerRecord& record);
     std::vector<AnswerRecord> list_answer_records(const std::string& player_id, std::size_t limit = 50) const;

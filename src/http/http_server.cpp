@@ -3,12 +3,15 @@
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <spdlog/spdlog.h>
 
-#include <atomic>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <exception>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -28,6 +31,48 @@ std::pair<std::string, std::string> split_target(const std::string& target)
         return {target.empty() ? "/" : target, {}};
     }
     return {target.substr(0, pos), target.substr(pos + 1)};
+}
+
+std::string endpoint_to_string(const tcp::endpoint& endpoint)
+{
+    return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
+}
+
+void log_access(const beast_http::request<beast_http::string_body>& request,
+                const tcp::endpoint& remote_endpoint,
+                int status_code,
+                std::chrono::milliseconds elapsed)
+{
+    const auto method = std::string(request.method_string());
+    const auto target = std::string(request.target());
+    const auto remote = endpoint_to_string(remote_endpoint);
+
+    if (status_code >= 500) {
+        spdlog::error("http_access method={} target={} status={} elapsed_ms={} remote={}",
+                      method,
+                      target,
+                      status_code,
+                      elapsed.count(),
+                      remote);
+        return;
+    }
+
+    if (status_code >= 400) {
+        spdlog::warn("http_access method={} target={} status={} elapsed_ms={} remote={}",
+                     method,
+                     target,
+                     status_code,
+                     elapsed.count(),
+                     remote);
+        return;
+    }
+
+    spdlog::info("http_access method={} target={} status={} elapsed_ms={} remote={}",
+                 method,
+                 target,
+                 status_code,
+                 elapsed.count(),
+                 remote);
 }
 
 HttpRequest to_http_request(const beast_http::request<beast_http::string_body>& request,
@@ -122,18 +167,29 @@ private:
         auto request = parser_->release();
         parser_.reset();
 
+        const auto started_at = std::chrono::steady_clock::now();
+        beast::error_code endpoint_error;
+        auto remote_endpoint = socket_.remote_endpoint(endpoint_error);
+        if (endpoint_error) {
+            remote_endpoint = tcp::endpoint{};
+        }
+
         HttpResponse response;
         if (request.method() == beast_http::verb::options) {
             response = HttpResponse::no_content();
         } else {
             try {
-                response = router_->route(to_http_request(request, socket_.remote_endpoint()));
+                response = router_->route(to_http_request(request, remote_endpoint));
             } catch (const std::exception& ex) {
                 response = HttpResponse::internal_error(ex.what());
             } catch (...) {
                 response = HttpResponse::internal_error("unknown server error");
             }
         }
+
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started_at);
+        log_access(request, remote_endpoint, response.status_code, elapsed);
 
         write_response(to_beast_response(response, request.version(), request.keep_alive(), config_.enable_cors));
     }

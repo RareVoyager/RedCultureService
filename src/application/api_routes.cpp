@@ -1,10 +1,13 @@
 #include "rcs/application/api_routes.hpp"
 
+#include "rcs/api/controllers/auth_controller.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -624,6 +627,8 @@ http::HttpResponse handle_ops(const http::HttpRequest& request,
 
 void register_api_routes(http::HttpRouter& router, std::shared_ptr<ServiceContext> context)
 {
+    auto auth_controller = std::make_shared<rcs::api::controllers::AuthController>(context);
+
     router.get("/", [context](const http::HttpRequest&) {
         return json_response(200, json{
             {"ok", true},
@@ -631,6 +636,7 @@ void register_api_routes(http::HttpRouter& router, std::shared_ptr<ServiceContex
             {"message", "RedCultureService HTTP API is running"},
             {"endpoints", {
                 "POST /api/v1/auth/login",
+                "POST /api/v1/auth/register",
                 "POST /api/v1/rooms/create",
                 "POST /api/v1/rooms/join",
                 "GET /api/v1/rooms",
@@ -646,6 +652,8 @@ void register_api_routes(http::HttpRouter& router, std::shared_ptr<ServiceContex
             }},
         });
     });
+
+    auth_controller->register_routes(router);
 
     router.post("/api/v1/auth/login", [context](const http::HttpRequest& request) {
         return handle_login(request, context);
