@@ -8,11 +8,12 @@
 
 namespace rcs::common {
 
-inline constexpr const char* kOkCode = "OK";
-inline constexpr const char* kOkMsg = "success";
-inline constexpr const char* kErrorCode = "ERROR";
+inline constexpr int RSuccessCode = 200;
+inline constexpr int RErrorCode = 500;
+inline constexpr const char* RSuccessMsg = "success";
+inline constexpr const char* RErrorMsg = "error";
 
-// 通用返回类型：成功时包含 data，失败时包含 code/msg。
+// 通用返回类型：包含 string code,string msg,T data
 template <typename T>
 class Result {
     static_assert(!std::is_void_v<T>, "Use Result<void> for void results");
@@ -20,24 +21,82 @@ class Result {
 public:
     using ValueType = T;
 
-    static Result success(T data, std::string code = kOkCode, std::string msg = kOkMsg)
+    static Result success()
     {
-        return Result(true, std::move(code), std::move(msg), std::move(data));
+        Result result;
+        result.code_ = RSuccessCode;
+        result.msg_ = RSuccessMsg;
+        return result;
     }
 
-    static Result failure(std::string code, std::string msg)
+    static Result success(T data)
     {
-        return Result(false, std::move(code), std::move(msg), std::nullopt);
+        Result result = success();
+        result.data_ = std::move(data);
+        return result;
+    }
+
+    template <typename U = T,
+              typename = std::enable_if_t<!std::is_same_v<std::decay_t<U>, std::string>>>
+    static Result success(std::string msg)
+    {
+        Result result = success();
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    static Result success(std::string msg, T data)
+    {
+        Result result = success(std::move(data));
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    // 当 T 是 std::string 时，success("xxx") 表示 data 会更符合 C++ 重载规则；
+    // 如果只想改成功提示信息，请使用这个显式函数。
+    static Result success_msg(std::string msg)
+    {
+        Result result = success();
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    static Result error()
+    {
+        Result result;
+        result.code_ = RErrorCode;
+        result.msg_ = RErrorMsg;
+        return result;
+    }
+
+    static Result error(std::string msg)
+    {
+        Result result = error();
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    static Result error(int code, std::string msg)
+    {
+        Result result;
+        result.code_ = code;
+        result.msg_ = std::move(msg);
+        return result;
     }
 
     static Result failure(std::string msg)
     {
-        return failure(kErrorCode, std::move(msg));
+        return error(std::move(msg));
+    }
+
+    static Result failure(int code, std::string msg)
+    {
+        return error(code, std::move(msg));
     }
 
     bool ok() const noexcept
     {
-        return ok_;
+        return code_ >= 200 && code_ < 300;
     }
 
     explicit operator bool() const noexcept
@@ -45,7 +104,7 @@ public:
         return ok();
     }
 
-    const std::string& code() const noexcept
+    int code() const noexcept
     {
         return code_;
     }
@@ -84,49 +143,75 @@ public:
     }
 
 private:
-    Result(bool ok, std::string code, std::string msg, std::optional<T> data)
-        : ok_(ok),
-          code_(std::move(code)),
-          msg_(std::move(msg)),
-          data_(std::move(data))
-    {
-    }
+    Result() = default;
 
     void ensure_data() const
     {
         if (!data_) {
-            throw std::logic_error("Result does not contain data: " + code_ + " " + msg_);
+            throw std::logic_error("Result does not contain data: " + std::to_string(code_) + " " + msg_);
         }
     }
 
-    bool ok_{false};
-    std::string code_;
+    int code_{RErrorCode};
     std::string msg_;
     std::optional<T> data_;
 };
 
-// void 特化：用于只关心成功/失败，不需要 data 的场景。
+// void 特化：用于只关心 code/msg，不需要 data 的场景。
 template <>
 class Result<void> {
 public:
-    static Result success(std::string code = kOkCode, std::string msg = kOkMsg)
+    static Result success()
     {
-        return Result(true, std::move(code), std::move(msg));
+        Result result;
+        result.code_ = RSuccessCode;
+        result.msg_ = RSuccessMsg;
+        return result;
     }
 
-    static Result failure(std::string code, std::string msg)
+    static Result success(std::string msg)
     {
-        return Result(false, std::move(code), std::move(msg));
+        Result result = success();
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    static Result error()
+    {
+        Result result;
+        result.code_ = RErrorCode;
+        result.msg_ = RErrorMsg;
+        return result;
+    }
+
+    static Result error(std::string msg)
+    {
+        Result result = error();
+        result.msg_ = std::move(msg);
+        return result;
+    }
+
+    static Result error(int code, std::string msg)
+    {
+        Result result;
+        result.code_ = code;
+        result.msg_ = std::move(msg);
+        return result;
     }
 
     static Result failure(std::string msg)
     {
-        return failure(kErrorCode, std::move(msg));
+        return error(std::move(msg));
+    }
+
+    static Result failure(int code, std::string msg)
+    {
+        return error(code, std::move(msg));
     }
 
     bool ok() const noexcept
     {
-        return ok_;
+        return code_ >= 200 && code_ < 300;
     }
 
     explicit operator bool() const noexcept
@@ -134,7 +219,7 @@ public:
         return ok();
     }
 
-    const std::string& code() const noexcept
+    int code() const noexcept
     {
         return code_;
     }
@@ -145,15 +230,9 @@ public:
     }
 
 private:
-    Result(bool ok, std::string code, std::string msg)
-        : ok_(ok),
-          code_(std::move(code)),
-          msg_(std::move(msg))
-    {
-    }
+    Result() = default;
 
-    bool ok_{false};
-    std::string code_;
+    int code_{RErrorCode};
     std::string msg_;
 };
 

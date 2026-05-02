@@ -2,43 +2,170 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
+#include <stdexcept>
 
-namespace {
+using rcs::common::Result;
 
-rcs::common::Result<int> divide(int lhs, int rhs)
+struct User {
+    int id{};
+    std::string name;
+};
+
+void test_success_without_data()
 {
-    if (rhs == 0) {
-        return rcs::common::Result<int>::failure("DIVIDE_BY_ZERO", "rhs must not be zero");
+    auto result = Result<int>::success();
+
+    std::cout << "test_success_without_data\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+    std::cout << "has_data = " << result.has_data() << '\n';
+
+    try {
+        int value = result.data();
+        std::cout << "data = " << value << '\n';
+    } catch (const std::logic_error& e) {
+        std::cout << "catch exception: " << e.what() << '\n';
     }
 
-    return rcs::common::Result<int>::success(lhs / rhs);
+    std::cout << "------------------------\n";
 }
 
-rcs::common::Result<void> validate_player_id(const std::string& player_id)
+void test_success_with_int_data()
 {
-    if (player_id.empty()) {
-        return rcs::common::Result<void>::failure("EMPTY_PLAYER_ID", "player_id is required");
+    auto result = Result<int>::success(100);
+
+    std::cout << "test_success_with_int_data\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "data = " << result.data() << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_success_with_msg_and_data()
+{
+    auto result = Result<int>::success("query user count success", 10);
+
+    std::cout << "test_success_with_msg_and_data\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "data = " << result.data() << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_error()
+{
+    auto result = Result<int>::error("database connection failed");
+
+    std::cout << "test_error\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+    std::cout << "has_data = " << result.has_data() << '\n';
+
+    if (!result) {
+        std::cout << "result is false\n";
     }
 
-    return rcs::common::Result<void>::success();
+    std::cout << "------------------------\n";
 }
 
-} // namespace
+void test_error_with_custom_code()
+{
+    auto result = Result<int>::error(404, "user not found");
+
+    std::cout << "test_error_with_custom_code\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_void_result()
+{
+    auto result = Result<void>::success("delete success");
+
+    std::cout << "test_void_result\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_string_result()
+{
+    auto result1 = Result<std::string>::success("hello");
+
+    std::cout << "test_string_result\n";
+    std::cout << "result1.code = " << result1.code() << '\n';
+    std::cout << "result1.msg = " << result1.msg() << '\n';
+    std::cout << "result1.data = " << result1.data() << '\n';
+
+    auto result2 = Result<std::string>::success_msg("only change success message");
+
+    std::cout << "result2.code = " << result2.code() << '\n';
+    std::cout << "result2.msg = " << result2.msg() << '\n';
+    std::cout << "result2.has_data = " << result2.has_data() << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_vector_result()
+{
+    std::vector<int> nums{1, 2, 3, 4, 5};
+
+    auto result = Result<std::vector<int>>::success("query list success", nums);
+
+    std::cout << "test_vector_result\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+
+    std::cout << "data = ";
+    for (int num : result.data()) {
+        std::cout << num << ' ';
+    }
+    std::cout << '\n';
+
+    std::cout << "------------------------\n";
+}
+
+void test_custom_struct_result()
+{
+    User user{1, "chenanqi"};
+
+    auto result = Result<User>::success("query user success", user);
+
+    std::cout << "test_custom_struct_result\n";
+    std::cout << "code = " << result.code() << '\n';
+    std::cout << "msg = " << result.msg() << '\n';
+    std::cout << "ok = " << result.ok() << '\n';
+    std::cout << "user.id = " << result.data().id << '\n';
+    std::cout << "user.name = " << result.data().name << '\n';
+
+    std::cout << "------------------------\n";
+}
 
 int main()
 {
-    const auto divided = divide(8, 2);
-    if (divided.ok()) {
-        std::cout << "divide result: " << divided.data() << '\n';
-    }
-
-    const auto failed = divide(8, 0);
-    if (!failed) {
-        std::cout << "divide failed: " << failed.code() << " " << failed.msg() << '\n';
-    }
-
-    const auto validated = validate_player_id("player_001");
-    std::cout << "validate player: " << validated.code() << " " << validated.msg() << '\n';
+    test_success_without_data();
+    test_success_with_int_data();
+    test_success_with_msg_and_data();
+    test_error();
+    test_error_with_custom_code();
+    test_void_result();
+    test_string_result();
+    test_vector_result();
+    test_custom_struct_result();
 
     return 0;
 }
