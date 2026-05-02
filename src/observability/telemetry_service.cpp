@@ -12,6 +12,7 @@ namespace rcs::observability {
 
 namespace {
 
+    // 返回日志等级
 spdlog::level::level_enum to_spdlog_level(LogLevel level) {
     switch (level) {
         case LogLevel::trace:
@@ -30,6 +31,7 @@ spdlog::level::level_enum to_spdlog_level(LogLevel level) {
     return spdlog::level::info;
 }
 
+    //
 std::string sanitize_metric_name(std::string name) {
     for (auto& ch : name) {
         const bool valid = (ch >= 'a' && ch <= 'z') ||
@@ -250,7 +252,7 @@ void TelemetryService::reset_metrics() {
     metrics_.clear();
 }
 
-void TelemetryService::configure_logger_locked() {
+void TelemetryService::configure_logger_locked() const {
     if (!config_.enable_console_log) {
         spdlog::drop(config_.logger_name);
         return;
