@@ -1,6 +1,6 @@
-#include "rcs/api/controllers/ops_controller.hpp"
+#include "redculture_server/api/controllers/ops_controller.hpp"
 
-#include "rcs/api/http_utils.hpp"
+#include "redculture_server/api/http_utils.hpp"
 
 #include <utility>
 
@@ -11,30 +11,30 @@ OpsController::OpsController(std::shared_ptr<application::ServiceContext> contex
 {
 }
 
-void OpsController::register_routes(http::HttpRouter& router)
+void OpsController::registerRoutes(http::HttpRouter& router)
 {
     auto self = shared_from_this();
 
     router.get("/api/v1/ops/health", [self](const http::HttpRequest& request) {
-        return self->forward_json(request, "/health", "health checked");
+        return self->forwardJson(request, "/health", "health checked");
     });
     router.get("/api/v1/ops/ready", [self](const http::HttpRequest& request) {
-        return self->forward_json(request, "/ready", "ready checked");
+        return self->forwardJson(request, "/ready", "ready checked");
     });
     router.get("/api/v1/ops/version", [self](const http::HttpRequest& request) {
-        return self->forward_json(request, "/version", "version fetched");
+        return self->forwardJson(request, "/version", "version fetched");
     });
     router.get("/api/v1/ops/metrics", [self](const http::HttpRequest& request) {
         return self->metrics(request);
     });
     router.post("/api/v1/ops/shutdown", [self](const http::HttpRequest& request) {
-        return self->forward_json(request, "/shutdown", "shutdown requested");
+        return self->forwardJson(request, "/shutdown", "shutdown requested");
     });
 }
 
-http::HttpResponse OpsController::forward_json(const http::HttpRequest& request,
+http::HttpResponse OpsController::forwardJson(const http::HttpRequest& request,
                                                std::string ops_path,
-                                               std::string success_msg)
+                                               std::string successMsg)
 {
     ops::AdminRequest admin_request;
     admin_request.method = request.method;
@@ -42,20 +42,20 @@ http::HttpResponse OpsController::forward_json(const http::HttpRequest& request,
     admin_request.body = request.body;
     admin_request.headers = request.headers;
 
-    const auto admin_response = context_->ops_service->handle_request(admin_request);
+    const auto admin_response = context_->ops_service->handleRequest(admin_request);
     auto data = support::Json::parse(admin_response.body, nullptr, false);
     if (data.is_discarded()) {
         data = support::Json{{"raw", admin_response.body}};
     }
 
     if (admin_response.status_code >= 400) {
-        return support::json_response(admin_response.status_code,
+        return support::jsonResponse(admin_response.status_code,
                                       support::Json{{"code", admin_response.status_code},
-                                                    {"msg", success_msg},
+                                                    {"msg", successMsg},
                                                     {"data", std::move(data)}});
     }
 
-    return support::success_response(std::move(data), std::move(success_msg));
+    return support::successResponse(std::move(data), std::move(successMsg));
 }
 
 http::HttpResponse OpsController::metrics(const http::HttpRequest& request)
@@ -65,7 +65,7 @@ http::HttpResponse OpsController::metrics(const http::HttpRequest& request)
     admin_request.path = "/metrics";
     admin_request.headers = request.headers;
 
-    const auto admin_response = context_->ops_service->handle_request(admin_request);
+    const auto admin_response = context_->ops_service->handleRequest(admin_request);
 
     http::HttpResponse response;
     response.status_code = admin_response.status_code;

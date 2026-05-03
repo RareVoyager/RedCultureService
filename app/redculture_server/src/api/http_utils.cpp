@@ -1,4 +1,4 @@
-#include "rcs/api/http_utils.hpp"
+#include "redculture_server/api/http_utils.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -10,7 +10,7 @@
 namespace rcs::api::support {
 namespace {
 
-std::string lower_copy(std::string value)
+std::string lowerCopy(std::string value)
 {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -20,30 +20,30 @@ std::string lower_copy(std::string value)
 
 } // namespace
 
-http::HttpResponse json_response(int status_code, const Json& body)
+http::HttpResponse jsonResponse(int status_code, const Json& body)
 {
     return http::HttpResponse::json(status_code, body.dump());
 }
 
-http::HttpResponse success_response(Json data, std::string msg, int code, int http_status)
+http::HttpResponse successResponse(Json data, std::string msg, int code, int http_status)
 {
     Json body;
     body["code"] = code;
     body["msg"] = std::move(msg);
     body["data"] = std::move(data);
-    return json_response(http_status, body);
+    return jsonResponse(http_status, body);
 }
 
-http::HttpResponse error_response(int http_status, int code, std::string msg)
+http::HttpResponse errorResponse(int http_status, int code, std::string msg)
 {
     Json body;
     body["code"] = code;
     body["msg"] = std::move(msg);
     body["data"] = nullptr;
-    return json_response(http_status, body);
+    return jsonResponse(http_status, body);
 }
 
-http::HttpResponse error_response_at(int http_status,
+http::HttpResponse errorResponseAt(int http_status,
                                      int code,
                                      std::string msg,
                                      const char* file,
@@ -57,10 +57,10 @@ http::HttpResponse error_response_at(int http_status,
                  http_status,
                  code,
                  msg);
-    return error_response(http_status, code, std::move(msg));
+    return errorResponse(http_status, code, std::move(msg));
 }
 
-common::Result<Json> parse_json_body(const http::HttpRequest& request)
+common::Result<Json> parseJsonBody(const http::HttpRequest& request)
 {
     if (request.body.empty()) {
         return common::Result<Json>::error(400, "request body must be a JSON object");
@@ -74,7 +74,7 @@ common::Result<Json> parse_json_body(const http::HttpRequest& request)
     return common::Result<Json>::success(std::move(body));
 }
 
-std::string read_string_or(const Json& body, const char* key, std::string fallback)
+std::string readStringOr(const Json& body, const char* key, std::string fallback)
 {
     const auto it = body.find(key);
     if (it == body.end() || !it->is_string()) {
@@ -84,7 +84,7 @@ std::string read_string_or(const Json& body, const char* key, std::string fallba
     return it->get<std::string>();
 }
 
-bool read_bool_or(const Json& body, const char* key, bool fallback)
+bool readBoolOr(const Json& body, const char* key, bool fallback)
 {
     const auto it = body.find(key);
     if (it == body.end() || !it->is_boolean()) {
@@ -94,7 +94,7 @@ bool read_bool_or(const Json& body, const char* key, bool fallback)
     return it->get<bool>();
 }
 
-std::uint64_t read_uint64_or(const Json& body, const char* key, std::uint64_t fallback)
+std::uint64_t readUint64Or(const Json& body, const char* key, std::uint64_t fallback)
 {
     const auto it = body.find(key);
     if (it == body.end()) {
@@ -121,31 +121,31 @@ std::uint64_t read_uint64_or(const Json& body, const char* key, std::uint64_t fa
     return fallback;
 }
 
-std::size_t read_size_or(const Json& body, const char* key, std::size_t fallback)
+std::size_t readSizeOr(const Json& body, const char* key, std::size_t fallback)
 {
-    return static_cast<std::size_t>(read_uint64_or(body, key, fallback));
+    return static_cast<std::size_t>(readUint64Or(body, key, fallback));
 }
 
-std::optional<std::string> find_header(const http::HttpRequest& request, const std::string& name)
+std::optional<std::string> findHeader(const http::HttpRequest& request, const std::string& name)
 {
-    const auto expected = lower_copy(name);
+    const auto expected = lowerCopy(name);
     for (const auto& [header_name, header_value] : request.headers) {
-        if (lower_copy(header_name) == expected) {
+        if (lowerCopy(header_name) == expected) {
             return header_value;
         }
     }
     return std::nullopt;
 }
 
-std::optional<std::string> bearer_token(const http::HttpRequest& request)
+std::optional<std::string> bearerToken(const http::HttpRequest& request)
 {
-    const auto header = find_header(request, "Authorization");
+    const auto header = findHeader(request, "Authorization");
     if (!header) {
         return std::nullopt;
     }
 
     const std::string prefix = "bearer ";
-    const auto lowered = lower_copy(*header);
+    const auto lowered = lowerCopy(*header);
     if (lowered.rfind(prefix, 0) != 0) {
         return std::nullopt;
     }
@@ -153,7 +153,7 @@ std::optional<std::string> bearer_token(const http::HttpRequest& request)
     return header->substr(prefix.size());
 }
 
-std::optional<std::string> query_value(const http::HttpRequest& request, const std::string& key)
+std::optional<std::string> queryValue(const http::HttpRequest& request, const std::string& key)
 {
     std::size_t begin = 0;
     while (begin <= request.query.size()) {
@@ -171,25 +171,25 @@ std::optional<std::string> query_value(const http::HttpRequest& request, const s
     return std::nullopt;
 }
 
-common::Result<std::string> resolve_player(const http::HttpRequest& request,
+common::Result<std::string> resolvePlayer(const http::HttpRequest& request,
                                            const Json& body,
                                            const std::shared_ptr<application::ServiceContext>& context)
 {
-    auto token = bearer_token(request);
-    const auto body_token = read_string_or(body, "token");
+    auto token = bearerToken(request);
+    const auto body_token = readStringOr(body, "token");
     if (!body_token.empty()) {
         token = body_token;
     }
 
     if (token && !token->empty()) {
-        const auto result = context->auth_service->validate_token(*token);
+        const auto result = context->auth_service->validateToken(*token);
         if (!result.ok || !result.claims) {
             return common::Result<std::string>::error(401, result.error.empty() ? "token is invalid" : result.error);
         }
         return common::Result<std::string>::success(result.claims->player_id);
     }
 
-    const auto player_id = read_string_or(body, "player_id");
+    const auto player_id = readStringOr(body, "player_id");
     if (context->config.allow_dev_auth && !player_id.empty()) {
         return common::Result<std::string>::success(player_id);
     }

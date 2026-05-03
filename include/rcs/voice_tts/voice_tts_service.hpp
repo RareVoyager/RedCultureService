@@ -42,7 +42,7 @@ struct VoiceProfile {
 struct TtsRequest {
     std::string text;
     VoiceProfile voice;
-    AudioFormat format{AudioFormat::mp3};
+    AudioFormat format{AudioFormat::wav};
     std::string player_id;
     std::string purpose{"ai_explanation"};
     bool cache_enabled{true};
@@ -51,8 +51,8 @@ struct TtsRequest {
 
 struct AudioResource {
     std::string id;
-    AudioFormat format{AudioFormat::mp3};
-    std::string mime_type{"audio/mpeg"};
+    AudioFormat format{AudioFormat::wav};
+    std::string mime_type{"audio/wav"};
     AudioBytes bytes;
     std::chrono::milliseconds duration{0};
     std::chrono::steady_clock::time_point created_at{};
@@ -68,8 +68,8 @@ struct TtsProviderRequest {
 
 struct TtsProviderResponse {
     bool ok{false};
-    AudioFormat format{AudioFormat::mp3};
-    std::string mime_type{"audio/mpeg"};
+    AudioFormat format{AudioFormat::wav};
+    std::string mime_type{"audio/wav"};
     AudioBytes bytes;
     std::chrono::milliseconds duration{0};
     std::string error;

@@ -415,7 +415,7 @@ bool CulturalInteractionService::saveAnswerEvent(const InteractionState& state, 
         audio.audio_id = state.snapshot.audio_id;
         audio.player_id = state.snapshot.player_id;
         audio.interaction_id = state.storage_interaction_id;
-        audio.mime_type = state.snapshot.audio_mime_type.empty() ? "audio/mpeg" : state.snapshot.audio_mime_type;
+        audio.mime_type = state.snapshot.audio_mime_type.empty() ? "audio/wav" : state.snapshot.audio_mime_type;
         audio.format = state.audio_format;
         audio.byte_size = state.audio_byte_size;
         audio.duration_ms = state.audio_duration_ms;

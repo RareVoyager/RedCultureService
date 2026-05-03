@@ -103,7 +103,7 @@ struct TtsAudioResourceRecord {
     std::string audio_id;
     std::string player_id;
     std::int64_t interaction_id{0};
-    std::string mime_type{"audio/mpeg"};
+    std::string mime_type{"audio/wav"};
     std::string format{"mp3"};
     std::int64_t byte_size{0};
     std::int64_t duration_ms{0};
