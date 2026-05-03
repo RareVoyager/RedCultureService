@@ -1,0 +1,435 @@
+{
+    "info":  {
+                 "name":  "RedCultureService 当前接口测试集合",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+                 "description":  "覆盖 redculture_server 当前所有已注册 HTTP 接口，可导入 Apifox/Postman。"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://127.0.0.1:8080"
+                     },
+                     {
+                         "key":  "playerId",
+                         "value":  "player_001"
+                     },
+                     {
+                         "key":  "account",
+                         "value":  "unity_editor"
+                     },
+                     {
+                         "key":  "password",
+                         "value":  "123456"
+                     },
+                     {
+                         "key":  "secondPlayerId",
+                         "value":  "player_002"
+                     },
+                     {
+                         "key":  "token",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "sessionId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "roomId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "interactionId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "flowId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "audioId",
+                         "value":  ""
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "01 运维接口",
+                     "item":  [
+                                  {
+                                      "name":  "健康检查",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ops/health"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "就绪检查",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ops/ready"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "版本信息",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ops/version"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Prometheus 指标",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ops/metrics"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 鉴权接口",
+                     "item":  [
+                                  {
+                                      "name":  "注册",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"player_id\": \"{{playerId}}\",\n  \"account\": \"{{account}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Unity测试玩家\",\n  \"avatar_url\": \"\",\n  \"connection_id\": 0,\n  \"metadata\": {\n    \"client\": \"apifox\",\n    \"platform\": \"unity-editor\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "if (body \u0026\u0026 body.data) {",
+                                                                                    "  pm.environment.set(\"token\", body.data.token || \"\");",
+                                                                                    "  if (body.data.session) pm.environment.set(\"sessionId\", body.data.session.session_id);",
+                                                                                    "}"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "账号密码登录",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/auth/login",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"account\": \"{{account}}\",\n  \"password\": \"{{password}}\",\n  \"connection_id\": 0\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "if (body \u0026\u0026 body.data) {",
+                                                                                    "  pm.environment.set(\"token\", body.data.token || \"\");",
+                                                                                    "  if (body.data.session) pm.environment.set(\"sessionId\", body.data.session.session_id);",
+                                                                                    "}"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Token 登录",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/auth/login",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"token\": \"{{token}}\",\n  \"connection_id\": 0\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 房间接口",
+                     "item":  [
+                                  {
+                                      "name":  "创建房间",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{token}}",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/rooms/create",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"mode\": \"story\",\n  \"max_players\": 4,\n  \"auto_start_when_full\": false,\n  \"connection_id\": 0\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "if (body \u0026\u0026 body.data \u0026\u0026 body.data.room) pm.environment.set(\"roomId\", body.data.room.room_id);"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "加入房间 - 本地开发模式第二玩家",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/rooms/join",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"player_id\": \"{{secondPlayerId}}\",\n  \"room_id\": \"{{roomId}}\",\n  \"connection_id\": 0\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "房间列表",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/rooms"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 互动与 TTS 接口",
+                     "item":  [
+                                  {
+                                      "name":  "开始答题互动",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{token}}",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/interactions/start",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"room_id\": \"{{roomId}}\",\n  \"scene_id\": \"museum_hall\",\n  \"trigger_id\": \"trigger_long_march\",\n  \"topic\": \"长征精神\",\n  \"question_prompt\": \"请围绕 {topic} 生成一个适合 Unity 互动场景的问题。\",\n  \"metadata\": {\n    \"client_version\": \"unity-editor\",\n    \"test_case\": \"apifox\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "if (body \u0026\u0026 body.data) {",
+                                                                                    "  pm.environment.set(\"interactionId\", body.data.interaction_id);",
+                                                                                    "  pm.environment.set(\"flowId\", body.data.flow_id);",
+                                                                                    "}"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "提交答案",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{token}}",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/interactions/answer",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"interaction_id\": \"{{interactionId}}\",\n  \"answer\": \"我看到了坚定理想信念、团结奋斗和不怕困难的长征精神。\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "if (body \u0026\u0026 body.data) pm.environment.set(\"audioId\", body.data.audio_id || \"\");"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "获取 TTS 音频 GET",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{token}}",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tts/audio?audio_id={{audioId}}"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "获取 TTS 音频 POST",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tts/audio",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"audio_id\": \"{{audioId}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "99 谨慎执行",
+                     "item":  [
+                                  {
+                                      "name":  "停服请求 - 最后手动执行",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "text/plain",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ops/shutdown",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "manual shutdown from apifox",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "text"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}
