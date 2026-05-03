@@ -126,22 +126,22 @@ public:
                              VoiceTtsConfig config = {});
 
     const VoiceTtsConfig& config() const noexcept;
-    void set_client(std::shared_ptr<ITtsClient> client);
+    void setClient(std::shared_ptr<ITtsClient> client);
 
     // 提交文本转语音任务。命中缓存时会直接返回 succeeded 任务。
     SubmitResult submit(TtsRequest request);
-    bool cancel_task(TtsTaskId task_id);
+    bool cancelTask(TtsTaskId task_id);
 
-    // 推进队列中的任务，执行实际 TTS 调用、重试和超时判断。
+    // 推进队列任务，执行 TTS 调用、重试和超时判断。
     TickResult tick(std::size_t max_tasks = 1);
 
-    std::optional<TtsTask> find_task(TtsTaskId task_id) const;
-    std::optional<AudioResource> find_audio(const std::string& audio_id) const;
-    std::vector<TtsTask> list_tasks() const;
+    std::optional<TtsTask> findTask(TtsTaskId task_id) const;
+    std::optional<AudioResource> findAudio(const std::string& audio_id) const;
+    std::vector<TtsTask> listTasks() const;
 
-    std::size_t queued_task_count() const;
-    std::size_t cache_size() const;
-    void clear_expired_cache();
+    std::size_t queuedTaskCount() const;
+    std::size_t cacheSize() const;
+    void clearExpiredCache();
 
 private:
     struct RunningTask {
@@ -150,17 +150,17 @@ private:
     };
 
     SubmitResult reject(std::string error) const;
-    std::string build_cache_key(const TtsRequest& request) const;
-    std::string build_audio_id(const std::string& cache_key, TtsTaskId task_id) const;
-    std::optional<AudioResource> find_cached_audio_locked(const std::string& cache_key,
-                                                          std::chrono::steady_clock::time_point now) const;
-    void store_cache_locked(const std::string& cache_key, const AudioResource& audio);
-    void enforce_cache_limit_locked();
-    std::optional<RunningTask> take_next_task_locked(std::chrono::steady_clock::time_point now);
-    TtsTask finish_task_locked(const RunningTask& running,
-                               TtsProviderResponse response,
-                               std::chrono::milliseconds elapsed,
-                               TickResult& result);
+    std::string buildCacheKey(const TtsRequest& request) const;
+    std::string buildAudioId(const std::string& cache_key, TtsTaskId task_id) const;
+    std::optional<AudioResource> findCachedAudioLocked(const std::string& cache_key,
+                                                       std::chrono::steady_clock::time_point now) const;
+    void storeCacheLocked(const std::string& cache_key, const AudioResource& audio);
+    void enforceCacheLimitLocked();
+    std::optional<RunningTask> takeNextTaskLocked(std::chrono::steady_clock::time_point now);
+    TtsTask finishTaskLocked(const RunningTask& running,
+                             TtsProviderResponse response,
+                             std::chrono::milliseconds elapsed,
+                             TickResult& result);
 
     VoiceTtsConfig config_;
     std::shared_ptr<ITtsClient> client_;
@@ -171,8 +171,8 @@ private:
     std::unordered_map<std::string, std::string> audio_id_to_cache_key_;
 };
 
-const char* to_string(AudioFormat format);
-const char* to_string(TtsTaskStatus status);
-const char* mime_type(AudioFormat format);
+const char* toString(AudioFormat format);
+const char* toString(TtsTaskStatus status);
+const char* mimeType(AudioFormat format);
 
 } // namespace rcs::voice_tts

@@ -26,7 +26,6 @@ struct ConnectionOptions {
 };
 
 // TCP 连接通过回调上报生命周期和已解码消息。
-// 网络网关持有这些回调，并负责把事件桥接到上层模块。
 struct ConnectionCallbacks {
     std::function<void(ConnectionId)> on_open;
     std::function<void(ConnectionId, const Message&)> on_message;
@@ -38,22 +37,21 @@ class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 public:
     using tcp = boost::asio::ip::tcp;
 
-    // 套接字已经由网络网关接收完成。每个连接独占自己的套接字，
-    // 并通过执行序列串行化该连接的异步处理逻辑。
-    TcpConnection(boost::asio::io_context& io_context,
+    // socket 已经由网关 accept 完成；每个连接只管理自己的异步读写队列。
+    TcpConnection(boost::asio::io_context& ioContext,
                   tcp::socket socket,
                   ConnectionId id,
                   ConnectionOptions options,
                   ConnectionCallbacks callbacks);
 
     ConnectionId id() const noexcept;
-    std::string remote_address() const;
-    std::chrono::steady_clock::time_point last_seen_at() const noexcept;
+    std::string remoteAddress() const;
+    std::chrono::steady_clock::time_point lastSeenAt() const noexcept;
 
-    // 对象进入 shared_ptr 管理之后，启动读循环。
+    // 对象进入 shared_ptr 管理之后启动读取循环。
     void start();
 
-    // 将消息加入异步写队列；多次发送会被串行化。
+    // 将消息加入异步写队列，多次发送会被串行化。
     void send(const Message& message);
 
     // 在连接 strand 上异步关闭。
@@ -61,13 +59,13 @@ public:
 
 private:
     // 先读帧头，再根据 payload 大小分配并读取 body。
-    void read_header();
-    void read_body(FrameHeader header);
+    void readHeader();
+    void readBody(FrameHeader header);
 
-    // 每次写出 outbound_queue_ 中的一帧。
-    void write_next();
+    // 每次写出 outbound_queue_ 中的队首帧。
+    void writeNext();
 
-    void close_now();
+    void closeNow();
     void fail(const std::string& reason);
 
     tcp::socket socket_;

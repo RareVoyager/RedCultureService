@@ -6,7 +6,7 @@
 
 namespace {
 
-void print_snapshot(const rcs::sync::StateSnapshot& snapshot) {
+void printSnapshot(const rcs::sync::StateSnapshot& snapshot) {
     std::cout << "snapshot room=" << snapshot.room_id
               << ", version=" << snapshot.version
               << ", players=" << snapshot.players.size()
@@ -30,9 +30,9 @@ int main() {
     config.max_move_speed_per_second = 20.0F;
 
     rcs::sync::StateSyncService sync(config);
-    sync.register_room(1001);
-    sync.add_player(1001, "player-1", 101);
-    sync.add_player(1001, "player-2", 102);
+    sync.registerRoom(1001);
+    sync.addPlayer(1001, "player-1", 101);
+    sync.addPlayer(1001, "player-2", 102);
 
     rcs::sync::StateInput input;
     input.room_id = 1001;
@@ -42,23 +42,23 @@ int main() {
     input.action = {"move", 1};
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    const auto result = sync.submit_state(input);
+    const auto result = sync.submitState(input);
     if (!result.ok) {
         std::cout << "submit failed: " << result.error << '\n';
         return 1;
     }
 
-    const auto deltas = sync.drain_deltas(1001);
+    const auto deltas = sync.drainDeltas(1001);
     std::cout << "deltas: " << deltas.size() << '\n';
 
-    auto snapshot = sync.build_snapshot(1001);
+    auto snapshot = sync.buildSnapshot(1001);
     if (snapshot) {
-        print_snapshot(*snapshot);
+        printSnapshot(*snapshot);
     }
 
     input.input_sequence = 2;
     input.transform.position = {999.0F, 0.0F, 0.0F};
-    const auto rejected = sync.submit_state(input);
+    const auto rejected = sync.submitState(input);
     std::cout << "teleport accepted: " << (rejected.ok ? "true" : "false")
               << ", reason: " << rejected.error << '\n';
 

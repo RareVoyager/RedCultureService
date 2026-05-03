@@ -2,7 +2,7 @@
 
 namespace rcs::common {
 
-std::string service_name() {
+std::string serviceName() {
     return "RedCultureService";
 }
 

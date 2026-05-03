@@ -15,7 +15,7 @@ public:
         rcs::voice_tts::TtsProviderResponse response;
         response.ok = true;
         response.format = request.request.format;
-        response.mime_type = rcs::voice_tts::mime_type(request.request.format);
+        response.mime_type = rcs::voice_tts::mimeType(request.request.format);
         response.bytes = std::move(bytes);
         response.duration = std::chrono::milliseconds(1800);
         response.metadata["mock"] = "true";
@@ -24,9 +24,9 @@ public:
     }
 };
 
-void print_task(const rcs::voice_tts::TtsTask& task) {
+void printTask(const rcs::voice_tts::TtsTask& task) {
     std::cout << "task id: " << task.id
-              << ", status: " << rcs::voice_tts::to_string(task.status)
+              << ", status: " << rcs::voice_tts::toString(task.status)
               << ", attempts: " << task.attempts
               << '\n';
 
@@ -58,15 +58,15 @@ int main() {
 
     auto tick = service.tick();
     if (!tick.succeeded_tasks.empty()) {
-        print_task(tick.succeeded_tasks.front());
+        printTask(tick.succeeded_tasks.front());
     }
 
     auto cached = service.submit(request);
     if (cached.cache_hit && cached.task) {
         std::cout << "cache hit\n";
-        print_task(*cached.task);
+        printTask(*cached.task);
     }
 
-    std::cout << "cache size: " << service.cache_size() << '\n';
+    std::cout << "cache size: " << service.cacheSize() << '\n';
     return 0;
 }

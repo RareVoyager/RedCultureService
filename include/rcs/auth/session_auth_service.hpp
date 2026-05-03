@@ -51,7 +51,7 @@ struct Session {
     std::uint64_t connection_id{0};
 
     std::chrono::steady_clock::time_point created_at{};
-    std::chrono::steady_clock::time_point last_seen_at{};
+    std::chrono::steady_clock::time_point lastSeenAt{};
     std::chrono::system_clock::time_point token_expires_at{};
 };
 
@@ -67,27 +67,27 @@ public:
 
     const AuthConfig& config() const noexcept;
 
-    // 签发一个 JWT。当前先接收已验证的玩家身份，账号密码校验后续接入 storage。
-    std::string issue_token(const std::string& player_id, const std::string& account) const;
+    // 签发 JWT。调用前应已经完成账号密码或第三方身份校验。
+    std::string issueToken(const std::string& player_id, const std::string& account) const;
 
     // 校验 JWT 签名、签发者、接收方和过期时间，并返回解析后的 claims。
-    AuthResult validate_token(const std::string& token) const;
+    AuthResult validateToken(const std::string& token) const;
 
     // 使用 token 创建或刷新内存会话。
-    LoginResult login_with_token(const std::string& token, std::uint64_t connection_id = 0);
+    LoginResult loginWithToken(const std::string& token, std::uint64_t connection_id = 0);
 
-    std::optional<Session> find_session(SessionId session_id) const;
-    std::optional<Session> find_session_by_player(const std::string& player_id) const;
+    std::optional<Session> findSession(SessionId session_id) const;
+    std::optional<Session> findSessionByPlayer(const std::string& player_id) const;
 
-    bool touch_session(SessionId session_id);
-    bool close_session(SessionId session_id);
-    void sweep_expired_sessions();
+    bool touchSession(SessionId session_id);
+    bool closeSession(SessionId session_id);
+    void sweepExpiredSessions();
 
-    std::size_t session_count() const;
+    std::size_t sessionCount() const;
 
 private:
-    bool is_session_expired(const Session& session, std::chrono::steady_clock::time_point now) const;
-    Session upsert_session(const TokenClaims& claims, std::uint64_t connection_id);
+    bool isSessionExpired(const Session& session, std::chrono::steady_clock::time_point now) const;
+    Session upsertSession(const TokenClaims& claims, std::uint64_t connection_id);
 
     AuthConfig config_;
     SessionId next_session_id_{1};

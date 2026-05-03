@@ -8,23 +8,23 @@ namespace rcs::room {
 
 namespace {
 
-bool is_valid_player(const PlayerRef& player) {
+bool isValidPlayer(const PlayerRef& player) {
     return !player.player_id.empty();
 }
 
-bool is_closed(const RoomInfo& room) {
+bool isClosed(const RoomInfo& room) {
     return room.state == RoomState::closed;
 }
 
 } // namespace
 
-RoomResult RoomMatchService::create_room(const PlayerRef& host, const RoomOptions& options) {
+RoomResult RoomMatchService::createRoom(const PlayerRef& host, const RoomOptions& options) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return create_room_locked(host, options);
+    return createRoomLocked(host, options);
 }
 
-RoomResult RoomMatchService::join_room(RoomId room_id, const PlayerRef& player) {
-    if (!is_valid_player(player)) {
+RoomResult RoomMatchService::joinRoom(RoomId room_id, const PlayerRef& player) {
+    if (!isValidPlayer(player)) {
         return RoomResult{false, "player_id is empty", std::nullopt};
     }
 
@@ -36,7 +36,7 @@ RoomResult RoomMatchService::join_room(RoomId room_id, const PlayerRef& player) 
     }
 
     auto& room = room_it->second;
-    if (is_closed(room)) {
+    if (isClosed(room)) {
         return RoomResult{false, "room is closed", room};
     }
 
@@ -47,7 +47,7 @@ RoomResult RoomMatchService::join_room(RoomId room_id, const PlayerRef& player) 
         return RoomResult{true, {}, room};
     }
 
-    const auto current_room = find_active_room_id_by_player_locked(player.player_id);
+    const auto current_room = findActiveRoomIdByPlayerLocked(player.player_id);
     if (current_room && *current_room != room_id) {
         return RoomResult{false, "player already in another room", std::nullopt};
     }
@@ -56,14 +56,14 @@ RoomResult RoomMatchService::join_room(RoomId room_id, const PlayerRef& player) 
         return RoomResult{false, "room is full", room};
     }
 
-    remove_player_ticket_locked(player.player_id);
+    removePlayerTicketLocked(player.player_id);
 
     room.members.push_back(RoomMember{player, false, std::chrono::steady_clock::now()});
-    update_room_state_locked(room);
+    updateRoomStateLocked(room);
     return RoomResult{true, {}, room};
 }
 
-RoomResult RoomMatchService::leave_room(RoomId room_id, const std::string& player_id) {
+RoomResult RoomMatchService::leaveRoom(RoomId room_id, const std::string& player_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -85,13 +85,13 @@ RoomResult RoomMatchService::leave_room(RoomId room_id, const std::string& playe
     if (room.members.empty()) {
         room.state = RoomState::closed;
     } else {
-        update_room_state_locked(room);
+        updateRoomStateLocked(room);
     }
     room.updated_at = std::chrono::steady_clock::now();
     return RoomResult{true, {}, room};
 }
 
-RoomResult RoomMatchService::close_room(RoomId room_id) {
+RoomResult RoomMatchService::closeRoom(RoomId room_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -105,7 +105,7 @@ RoomResult RoomMatchService::close_room(RoomId room_id) {
     return RoomResult{true, {}, room};
 }
 
-RoomResult RoomMatchService::set_ready(RoomId room_id, const std::string& player_id, bool ready) {
+RoomResult RoomMatchService::setReady(RoomId room_id, const std::string& player_id, bool ready) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -114,7 +114,7 @@ RoomResult RoomMatchService::set_ready(RoomId room_id, const std::string& player
     }
 
     auto& room = room_it->second;
-    if (is_closed(room)) {
+    if (isClosed(room)) {
         return RoomResult{false, "room is closed", room};
     }
 
@@ -130,7 +130,7 @@ RoomResult RoomMatchService::set_ready(RoomId room_id, const std::string& player
     return RoomResult{true, {}, room};
 }
 
-std::optional<RoomInfo> RoomMatchService::find_room(RoomId room_id) const {
+std::optional<RoomInfo> RoomMatchService::findRoom(RoomId room_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = rooms_.find(room_id);
     if (it == rooms_.end()) {
@@ -139,30 +139,30 @@ std::optional<RoomInfo> RoomMatchService::find_room(RoomId room_id) const {
     return it->second;
 }
 
-std::optional<RoomInfo> RoomMatchService::find_room_by_player(const std::string& player_id) const {
+std::optional<RoomInfo> RoomMatchService::findRoomByPlayer(const std::string& player_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    const auto room_id = find_active_room_id_by_player_locked(player_id);
+    const auto room_id = findActiveRoomIdByPlayerLocked(player_id);
     if (!room_id) {
         return std::nullopt;
     }
     return rooms_.at(*room_id);
 }
 
-std::vector<RoomInfo> RoomMatchService::list_rooms(bool include_closed) const {
+std::vector<RoomInfo> RoomMatchService::listRooms(bool include_closed) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<RoomInfo> rooms;
     rooms.reserve(rooms_.size());
     for (const auto& [_, room] : rooms_) {
-        if (include_closed || !is_closed(room)) {
+        if (include_closed || !isClosed(room)) {
             rooms.push_back(room);
         }
     }
     return rooms;
 }
 
-MatchTicketResult RoomMatchService::enqueue_match(const MatchRequest& request) {
-    if (!is_valid_player(request.player)) {
+MatchTicketResult RoomMatchService::enqueueMatch(const MatchRequest& request) {
+    if (!isValidPlayer(request.player)) {
         return MatchTicketResult{false, "player_id is empty", std::nullopt};
     }
     if (request.preferred_room_size == 0) {
@@ -171,7 +171,7 @@ MatchTicketResult RoomMatchService::enqueue_match(const MatchRequest& request) {
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (find_active_room_id_by_player_locked(request.player.player_id)) {
+    if (findActiveRoomIdByPlayerLocked(request.player.player_id)) {
         return MatchTicketResult{false, "player already in room", std::nullopt};
     }
     if (player_tickets_.find(request.player.player_id) != player_tickets_.end()) {
@@ -188,7 +188,7 @@ MatchTicketResult RoomMatchService::enqueue_match(const MatchRequest& request) {
     return MatchTicketResult{true, {}, ticket};
 }
 
-bool RoomMatchService::cancel_match(MatchTicketId ticket_id) {
+bool RoomMatchService::cancelMatch(MatchTicketId ticket_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = std::find_if(match_queue_.begin(), match_queue_.end(), [&](const MatchTicket& ticket) {
@@ -203,14 +203,14 @@ bool RoomMatchService::cancel_match(MatchTicketId ticket_id) {
     return true;
 }
 
-bool RoomMatchService::cancel_match_by_player(const std::string& player_id) {
+bool RoomMatchService::cancelMatchByPlayer(const std::string& player_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (player_tickets_.find(player_id) == player_tickets_.end()) {
         return false;
     }
 
-    remove_player_ticket_locked(player_id);
+    removePlayerTicketLocked(player_id);
     return true;
 }
 
@@ -241,7 +241,7 @@ MatchTickResult RoomMatchService::tick() {
 
             for (auto it = match_queue_.begin(); it != match_queue_.end() &&
                  group.size() < seed_it->request.preferred_room_size; ++it) {
-                if (it->id != seed_it->id && same_match_bucket(*seed_it, *it)) {
+                if (it->id != seed_it->id && sameMatchBucket(*seed_it, *it)) {
                     group.push_back(*it);
                 }
             }
@@ -270,7 +270,7 @@ MatchTickResult RoomMatchService::tick() {
         options.max_players = group.front().request.preferred_room_size;
         options.auto_start_when_full = true;
 
-        auto room_result = create_room_locked(group.front().request.player, options);
+        auto room_result = createRoomLocked(group.front().request.player, options);
         if (!room_result.ok || !room_result.room) {
             continue;
         }
@@ -283,7 +283,7 @@ MatchTickResult RoomMatchService::tick() {
                 std::chrono::steady_clock::now(),
             });
         }
-        update_room_state_locked(stored_room);
+        updateRoomStateLocked(stored_room);
         result.created_rooms.push_back(stored_room);
         created_room = true;
     }
@@ -291,32 +291,32 @@ MatchTickResult RoomMatchService::tick() {
     return result;
 }
 
-std::size_t RoomMatchService::room_count(bool include_closed) const {
+std::size_t RoomMatchService::roomCount(bool include_closed) const {
     std::lock_guard<std::mutex> lock(mutex_);
     return static_cast<std::size_t>(std::count_if(rooms_.begin(), rooms_.end(), [&](const auto& item) {
-        return include_closed || !is_closed(item.second);
+        return include_closed || !isClosed(item.second);
     }));
 }
 
-std::size_t RoomMatchService::waiting_count(std::optional<std::string> mode) const {
+std::size_t RoomMatchService::waitingCount(std::optional<std::string> mode) const {
     std::lock_guard<std::mutex> lock(mutex_);
     return static_cast<std::size_t>(std::count_if(match_queue_.begin(), match_queue_.end(), [&](const MatchTicket& ticket) {
         return !mode || ticket.request.mode == *mode;
     }));
 }
 
-RoomResult RoomMatchService::create_room_locked(const PlayerRef& host, const RoomOptions& options) {
-    if (!is_valid_player(host)) {
+RoomResult RoomMatchService::createRoomLocked(const PlayerRef& host, const RoomOptions& options) {
+    if (!isValidPlayer(host)) {
         return RoomResult{false, "player_id is empty", std::nullopt};
     }
     if (options.max_players == 0) {
         return RoomResult{false, "max_players must be greater than zero", std::nullopt};
     }
-    if (find_active_room_id_by_player_locked(host.player_id)) {
+    if (findActiveRoomIdByPlayerLocked(host.player_id)) {
         return RoomResult{false, "player already in room", std::nullopt};
     }
 
-    remove_player_ticket_locked(host.player_id);
+    removePlayerTicketLocked(host.player_id);
 
     const auto now = std::chrono::steady_clock::now();
 
@@ -329,15 +329,15 @@ RoomResult RoomMatchService::create_room_locked(const PlayerRef& host, const Roo
     room.created_at = now;
     room.updated_at = now;
     room.members.push_back(RoomMember{host, false, now});
-    update_room_state_locked(room);
+    updateRoomStateLocked(room);
 
     rooms_[room.id] = room;
     return RoomResult{true, {}, room};
 }
 
-std::optional<RoomId> RoomMatchService::find_active_room_id_by_player_locked(const std::string& player_id) const {
+std::optional<RoomId> RoomMatchService::findActiveRoomIdByPlayerLocked(const std::string& player_id) const {
     for (const auto& [room_id, room] : rooms_) {
-        if (is_closed(room)) {
+        if (isClosed(room)) {
             continue;
         }
 
@@ -351,7 +351,7 @@ std::optional<RoomId> RoomMatchService::find_active_room_id_by_player_locked(con
     return std::nullopt;
 }
 
-void RoomMatchService::remove_player_ticket_locked(const std::string& player_id) {
+void RoomMatchService::removePlayerTicketLocked(const std::string& player_id) {
     const auto ticket_it = player_tickets_.find(player_id);
     if (ticket_it == player_tickets_.end()) {
         return;
@@ -365,7 +365,7 @@ void RoomMatchService::remove_player_ticket_locked(const std::string& player_id)
     player_tickets_.erase(ticket_it);
 }
 
-void RoomMatchService::update_room_state_locked(RoomInfo& room) {
+void RoomMatchService::updateRoomStateLocked(RoomInfo& room) {
     if (room.members.empty()) {
         room.state = RoomState::closed;
     } else if (room.auto_start_when_full && room.members.size() >= room.max_players) {
@@ -377,12 +377,12 @@ void RoomMatchService::update_room_state_locked(RoomInfo& room) {
     room.updated_at = std::chrono::steady_clock::now();
 }
 
-bool RoomMatchService::same_match_bucket(const MatchTicket& lhs, const MatchTicket& rhs) const {
+bool RoomMatchService::sameMatchBucket(const MatchTicket& lhs, const MatchTicket& rhs) const {
     return lhs.request.mode == rhs.request.mode &&
            lhs.request.preferred_room_size == rhs.request.preferred_room_size;
 }
 
-const char* to_string(RoomState state) {
+const char* toString(RoomState state) {
     switch (state) {
         case RoomState::waiting:
             return "waiting";

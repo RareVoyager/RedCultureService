@@ -2,6 +2,7 @@
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/post.hpp>
+
 #include <utility>
 
 namespace rcs::net {
@@ -9,18 +10,22 @@ namespace rcs::net {
 NetworkGateway::NetworkGateway(NetworkGatewayConfig config)
     : config_(std::move(config)),
       acceptor_(io_context_),
-      strand_(io_context_.get_executor()) {}
+      strand_(io_context_.get_executor())
+{
+}
 
-NetworkGateway::~NetworkGateway() {
+NetworkGateway::~NetworkGateway()
+{
     stop();
 }
 
-void NetworkGateway::start() {
+void NetworkGateway::start()
+{
     if (running_) {
         return;
     }
 
-    // 重启上下文，允许同一个网关实例在停止之后再次启动。
+    // 重启上下文，允许同一个网关实例在停止后再次启动。
     io_context_.restart();
 
     const auto address = boost::asio::ip::make_address(config_.listen_address);
@@ -32,15 +37,15 @@ void NetworkGateway::start() {
     acceptor_.listen();
 
     running_ = true;
-    accept_next();
+    acceptNext();
 }
 
-void NetworkGateway::stop() {
+void NetworkGateway::stop()
+{
     if (!running_) {
         return;
     }
 
-    // 关闭接收器会取消尚未完成的异步接收。
     running_ = false;
     boost::system::error_code ignored;
     acceptor_.close(ignored);
@@ -52,32 +57,39 @@ void NetworkGateway::stop() {
     io_context_.stop();
 }
 
-void NetworkGateway::run() {
+void NetworkGateway::run()
+{
     io_context_.run();
 }
 
-void NetworkGateway::poll() {
+void NetworkGateway::poll()
+{
     io_context_.poll();
 }
 
-bool NetworkGateway::is_running() const noexcept {
+bool NetworkGateway::isRunning() const noexcept
+{
     return running_;
 }
 
-std::size_t NetworkGateway::connection_count() const {
+std::size_t NetworkGateway::connectionCount() const
+{
     return connections_.size();
 }
 
-const NetworkGatewayConfig& NetworkGateway::config() const noexcept {
+const NetworkGatewayConfig& NetworkGateway::config() const noexcept
+{
     return config_;
 }
 
-boost::asio::io_context& NetworkGateway::io_context() noexcept {
+boost::asio::io_context& NetworkGateway::ioContext() noexcept
+{
     return io_context_;
 }
 
-void NetworkGateway::send(ConnectionId id, const Message& message) {
-    // 通过网关执行序列访问连接表，保证读操作安全。
+void NetworkGateway::send(ConnectionId id, const Message& message)
+{
+    // 通过网关 strand 访问连接表，保证跨线程调用时安全。
     boost::asio::post(strand_, [this, id, message]() {
         const auto it = connections_.find(id);
         if (it != connections_.end()) {
@@ -86,7 +98,8 @@ void NetworkGateway::send(ConnectionId id, const Message& message) {
     });
 }
 
-void NetworkGateway::broadcast(const Message& message) {
+void NetworkGateway::broadcast(const Message& message)
+{
     // 广播采用尽力而为策略；已关闭连接会通过自身 close 回调移除。
     boost::asio::post(strand_, [this, message]() {
         for (auto& [_, connection] : connections_) {
@@ -95,23 +108,28 @@ void NetworkGateway::broadcast(const Message& message) {
     });
 }
 
-void NetworkGateway::set_on_connection_open(std::function<void(ConnectionId)> callback) {
+void NetworkGateway::setOnConnectionOpen(std::function<void(ConnectionId)> callback)
+{
     callbacks_.on_open = std::move(callback);
 }
 
-void NetworkGateway::set_on_message(std::function<void(ConnectionId, const Message&)> callback) {
+void NetworkGateway::setOnMessage(std::function<void(ConnectionId, const Message&)> callback)
+{
     callbacks_.on_message = std::move(callback);
 }
 
-void NetworkGateway::set_on_connection_error(std::function<void(ConnectionId, const std::string&)> callback) {
+void NetworkGateway::setOnConnectionError(std::function<void(ConnectionId, const std::string&)> callback)
+{
     callbacks_.on_error = std::move(callback);
 }
 
-void NetworkGateway::set_on_connection_close(std::function<void(ConnectionId)> callback) {
+void NetworkGateway::setOnConnectionClose(std::function<void(ConnectionId)> callback)
+{
     callbacks_.on_close = std::move(callback);
 }
 
-void NetworkGateway::accept_next() {
+void NetworkGateway::acceptNext()
+{
     acceptor_.async_accept(boost::asio::bind_executor(
         strand_,
         [this](boost::system::error_code ec, tcp::socket socket) {
@@ -124,17 +142,15 @@ void NetworkGateway::accept_next() {
                     boost::system::error_code ignored;
                     socket.close(ignored);
                 } else {
-                    // 在当前进程内分配单调递增的连接 id。
                     const auto id = next_connection_id_++;
-                    auto connection_callbacks = callbacks_;
+                    auto connectionCallbacks = callbacks_;
 
-                    // 先从连接表移除，再转发 close 给外部观察者；
-                    // 这样外部读取 connection_count() 时已经是最新状态。
-                    connection_callbacks.on_close = [this, original = callbacks_.on_close](ConnectionId closed_id) {
-                        boost::asio::post(strand_, [this, original, closed_id]() {
-                            remove_connection(closed_id);
+                    // 先从连接表移除，再通知外部观察者，避免 connectionCount() 读到旧状态。
+                    connectionCallbacks.on_close = [this, original = callbacks_.on_close](ConnectionId closedId) {
+                        boost::asio::post(strand_, [this, original, closedId]() {
+                            removeConnection(closedId);
                             if (original) {
-                                original(closed_id);
+                                original(closedId);
                             }
                         });
                     };
@@ -144,20 +160,19 @@ void NetworkGateway::accept_next() {
                         std::move(socket),
                         id,
                         config_.connection_options,
-                        std::move(connection_callbacks));
+                        std::move(connectionCallbacks));
 
                     connections_.emplace(id, connection);
                     connection->start();
                 }
             }
 
-            accept_next();
+            acceptNext();
         }));
 }
 
-void NetworkGateway::remove_connection(ConnectionId id) {
-    // 擦除共享指针后，连接对象会在所有未完成处理函数释放
-    // 自身共享引用后自然析构。
+void NetworkGateway::removeConnection(ConnectionId id)
+{
     connections_.erase(id);
 }
 

@@ -13,8 +13,8 @@ class HttpRouter {
 public:
     using Handler = std::function<HttpResponse(const HttpRequest&)>;
 
-    // 注册 method + path 到一个 handler，path 当前采用精确匹配，后续可扩展路径参数。
-    void add_route(std::string method, std::string path, Handler handler);
+    // 注册 method + path 到一个 handler，path 当前采用精确匹配。
+    void addRoute(std::string method, std::string path, Handler handler);
 
     // 常用 HTTP 方法的便捷注册函数，让写法接近 Spring 的路由声明。
     void get(std::string path, Handler handler);
@@ -24,10 +24,10 @@ public:
 
     // 根据请求路径和方法分发到具体业务 handler。
     HttpResponse route(const HttpRequest& request) const;
-    bool has_route(const std::string& method, const std::string& path) const;
+    bool hasRoute(const std::string& method, const std::string& path) const;
 
 private:
-    static std::string normalize_method(std::string method);
+    static std::string normalizeMethod(std::string method);
 
     mutable std::shared_mutex mutex_;
     std::unordered_map<std::string, std::unordered_map<std::string, Handler>> routes_;

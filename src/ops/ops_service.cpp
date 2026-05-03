@@ -9,23 +9,23 @@ namespace rcs::ops {
 
 namespace {
 
-std::int64_t epoch_millis(std::chrono::system_clock::time_point time) {
+std::int64_t epochMillis(std::chrono::system_clock::time_point time) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count();
 }
 
-std::string normalize_method(std::string method) {
+std::string normalizeMethod(std::string method) {
     std::transform(method.begin(), method.end(), method.begin(), [](unsigned char ch) {
         return static_cast<char>(std::toupper(ch));
     });
     return method;
 }
 
-nlohmann::json component_to_json(const ComponentHealth& component) {
+nlohmann::json componentToJson(const ComponentHealth& component) {
     return {
         {"component", component.component},
         {"healthy", component.healthy},
         {"message", component.message},
-        {"checked_at_ms", epoch_millis(component.checked_at)},
+        {"checked_at_ms", epochMillis(component.checked_at)},
     };
 }
 
@@ -39,9 +39,9 @@ const OpsConfig& OpsService::config() const noexcept {
     return config_;
 }
 
-VersionInfo OpsService::version_info() const {
+VersionInfo OpsService::versionInfo() const {
     return VersionInfo{
-        config_.service_name,
+        config_.serviceName,
         config_.version,
         config_.environment,
         config_.instance_id,
@@ -56,19 +56,19 @@ void OpsService::start() {
     unhealthy_reason_.clear();
 }
 
-void OpsService::set_ready(bool ready) {
+void OpsService::setReady(bool ready) {
     std::lock_guard<std::mutex> lock(mutex_);
     ready_ = ready;
 }
 
-void OpsService::mark_unhealthy(std::string reason) {
+void OpsService::markUnhealthy(std::string reason) {
     std::lock_guard<std::mutex> lock(mutex_);
     status_ = ServiceStatus::unhealthy;
     ready_ = false;
     unhealthy_reason_ = std::move(reason);
 }
 
-void OpsService::begin_shutdown(std::string reason) {
+void OpsService::beginShutdown(std::string reason) {
     ShutdownCallback callback;
     std::string callback_reason;
 
@@ -90,18 +90,18 @@ void OpsService::begin_shutdown(std::string reason) {
     }
 }
 
-void OpsService::complete_shutdown() {
+void OpsService::completeShutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     status_ = ServiceStatus::stopped;
     ready_ = false;
 }
 
-bool OpsService::is_ready() const {
+bool OpsService::isReady() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return ready_ && status_ == ServiceStatus::running;
 }
 
-bool OpsService::is_shutting_down() const {
+bool OpsService::isShuttingDown() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return status_ == ServiceStatus::draining || status_ == ServiceStatus::stopping;
 }
@@ -111,7 +111,7 @@ ServiceStatus OpsService::status() const {
     return status_;
 }
 
-std::optional<std::string> OpsService::shutdown_reason() const {
+std::optional<std::string> OpsService::shutdownReason() const {
     std::lock_guard<std::mutex> lock(mutex_);
     if (shutdown_reason_.empty()) {
         return std::nullopt;
@@ -119,7 +119,7 @@ std::optional<std::string> OpsService::shutdown_reason() const {
     return shutdown_reason_;
 }
 
-bool OpsService::register_health_check(std::string component, HealthCheck check) {
+bool OpsService::registerHealthCheck(std::string component, HealthCheck check) {
     if (component.empty() || !check) {
         return false;
     }
@@ -129,26 +129,26 @@ bool OpsService::register_health_check(std::string component, HealthCheck check)
     return true;
 }
 
-bool OpsService::unregister_health_check(const std::string& component) {
+bool OpsService::unregisterHealthCheck(const std::string& component) {
     std::lock_guard<std::mutex> lock(mutex_);
     return health_checks_.erase(component) > 0;
 }
 
-void OpsService::set_metrics_exporter(MetricsExporter exporter) {
+void OpsService::setMetricsExporter(MetricsExporter exporter) {
     std::lock_guard<std::mutex> lock(mutex_);
     metrics_exporter_ = std::move(exporter);
 }
 
-void OpsService::set_shutdown_callback(ShutdownCallback callback) {
+void OpsService::setShutdownCallback(ShutdownCallback callback) {
     std::lock_guard<std::mutex> lock(mutex_);
     shutdown_callback_ = std::move(callback);
 }
 
-HealthReport OpsService::collect_health_report() const {
+HealthReport OpsService::collectHealthReport() const {
     ServiceStatus current_status;
     bool current_ready;
     std::string unhealthy_reason;
-    auto checks = health_checks_snapshot();
+    auto checks = healthChecksSnapshot();
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -195,46 +195,46 @@ HealthReport OpsService::collect_health_report() const {
     return report;
 }
 
-AdminResponse OpsService::handle_request(const AdminRequest& request) {
-    const auto method = normalize_method(request.method);
+AdminResponse OpsService::handleRequest(const AdminRequest& request) {
+    const auto method = normalizeMethod(request.method);
 
     if (method == "GET" && request.path == "/health") {
-        return health_response();
+        return healthResponse();
     }
     if (method == "GET" && request.path == "/ready") {
-        return ready_response();
+        return readyResponse();
     }
     if (method == "GET" && request.path == "/version") {
-        return version_response();
+        return versionResponse();
     }
     if (method == "GET" && request.path == "/metrics") {
-        return metrics_response();
+        return metricsResponse();
     }
     if (method == "POST" && request.path == "/shutdown") {
-        return shutdown_response(request.body.empty() ? "admin request" : request.body);
+        return shutdownResponse(request.body.empty() ? "admin request" : request.body);
     }
 
-    return json_response(404, R"({"error":"admin route not found"})");
+    return jsonResponse(404, R"({"error":"admin route not found"})");
 }
 
-AdminResponse OpsService::health_response() const {
-    const auto report = collect_health_report();
-    return json_response(report.healthy ? 200 : 503, health_report_json(report));
+AdminResponse OpsService::healthResponse() const {
+    const auto report = collectHealthReport();
+    return jsonResponse(report.healthy ? 200 : 503, healthReportJson(report));
 }
 
-AdminResponse OpsService::ready_response() const {
-    const auto ready = is_ready();
+AdminResponse OpsService::readyResponse() const {
+    const auto ready = isReady();
     nlohmann::json body;
     body["ready"] = ready;
-    body["status"] = to_string(status());
-    return json_response(ready ? 200 : 503, body.dump());
+    body["status"] = toString(status());
+    return jsonResponse(ready ? 200 : 503, body.dump());
 }
 
-AdminResponse OpsService::version_response() const {
-    return json_response(200, version_json());
+AdminResponse OpsService::versionResponse() const {
+    return jsonResponse(200, versionJson());
 }
 
-AdminResponse OpsService::metrics_response() const {
+AdminResponse OpsService::metricsResponse() const {
     MetricsExporter exporter;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -242,26 +242,26 @@ AdminResponse OpsService::metrics_response() const {
     }
 
     if (!exporter) {
-        return text_response(200, "# metrics exporter is not configured\n", "text/plain; version=0.0.4");
+        return textResponse(200, "# metrics exporter is not configured\n", "text/plain; version=0.0.4");
     }
 
-    return text_response(200, exporter(), "text/plain; version=0.0.4");
+    return textResponse(200, exporter(), "text/plain; version=0.0.4");
 }
 
-AdminResponse OpsService::shutdown_response(std::string reason) {
-    begin_shutdown(std::move(reason));
+AdminResponse OpsService::shutdownResponse(std::string reason) {
+    beginShutdown(std::move(reason));
 
     nlohmann::json body;
     body["accepted"] = true;
-    body["status"] = to_string(status());
+    body["status"] = toString(status());
     body["grace_period_seconds"] = config_.shutdown_grace_period.count();
-    if (auto reason_value = shutdown_reason()) {
+    if (auto reason_value = shutdownReason()) {
         body["reason"] = *reason_value;
     }
-    return json_response(202, body.dump());
+    return jsonResponse(202, body.dump());
 }
 
-std::vector<OpsService::HealthCheck> OpsService::health_checks_snapshot() const {
+std::vector<OpsService::HealthCheck> OpsService::healthChecksSnapshot() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<HealthCheck> checks;
@@ -272,34 +272,34 @@ std::vector<OpsService::HealthCheck> OpsService::health_checks_snapshot() const 
     return checks;
 }
 
-std::string OpsService::health_report_json(const HealthReport& report) const {
+std::string OpsService::healthReportJson(const HealthReport& report) const {
     nlohmann::json body;
     body["healthy"] = report.healthy;
     body["ready"] = report.ready;
-    body["status"] = to_string(report.status);
-    body["checked_at_ms"] = epoch_millis(report.checked_at);
+    body["status"] = toString(report.status);
+    body["checked_at_ms"] = epochMillis(report.checked_at);
     body["components"] = nlohmann::json::array();
 
     for (const auto& component : report.components) {
-        body["components"].push_back(component_to_json(component));
+        body["components"].push_back(componentToJson(component));
     }
 
     return body.dump();
 }
 
-std::string OpsService::version_json() const {
-    const auto version = version_info();
+std::string OpsService::versionJson() const {
+    const auto version = versionInfo();
 
     nlohmann::json body;
-    body["service_name"] = version.service_name;
+    body["serviceName"] = version.serviceName;
     body["version"] = version.version;
     body["environment"] = version.environment;
     body["instance_id"] = version.instance_id;
-    body["started_at_ms"] = epoch_millis(version.started_at);
+    body["started_at_ms"] = epochMillis(version.started_at);
     return body.dump();
 }
 
-AdminResponse OpsService::json_response(int status_code, std::string body) const {
+AdminResponse OpsService::jsonResponse(int status_code, std::string body) const {
     return AdminResponse{
         status_code,
         "application/json",
@@ -308,7 +308,7 @@ AdminResponse OpsService::json_response(int status_code, std::string body) const
     };
 }
 
-AdminResponse OpsService::text_response(int status_code, std::string body, std::string content_type) const {
+AdminResponse OpsService::textResponse(int status_code, std::string body, std::string content_type) const {
     return AdminResponse{
         status_code,
         std::move(content_type),
@@ -317,7 +317,7 @@ AdminResponse OpsService::text_response(int status_code, std::string body, std::
     };
 }
 
-const char* to_string(ServiceStatus status) {
+const char* toString(ServiceStatus status) {
     switch (status) {
         case ServiceStatus::starting:
             return "starting";

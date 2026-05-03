@@ -9,11 +9,11 @@ namespace rcs::voice_tts {
 
 namespace {
 
-std::uint32_t max_attempts_from_retries(std::uint32_t max_retries) {
+std::uint32_t maxAttemptsFromRetries(std::uint32_t max_retries) {
     return max_retries + 1;
 }
 
-bool is_finished(TtsTaskStatus status) {
+bool isFinished(TtsTaskStatus status) {
     return status == TtsTaskStatus::succeeded ||
            status == TtsTaskStatus::failed ||
            status == TtsTaskStatus::timed_out ||
@@ -31,7 +31,7 @@ const VoiceTtsConfig& VoiceTtsService::config() const noexcept {
     return config_;
 }
 
-void VoiceTtsService::set_client(std::shared_ptr<ITtsClient> client) {
+void VoiceTtsService::setClient(std::shared_ptr<ITtsClient> client) {
     std::lock_guard<std::mutex> lock(mutex_);
     client_ = std::move(client);
 }
@@ -54,9 +54,9 @@ SubmitResult VoiceTtsService::submit(TtsRequest request) {
     }
 
     const auto now = std::chrono::steady_clock::now();
-    const auto cache_key = build_cache_key(request);
+    const auto cache_key = buildCacheKey(request);
     if (request.cache_enabled) {
-        auto cached = find_cached_audio_locked(cache_key, now);
+        auto cached = findCachedAudioLocked(cache_key, now);
         if (cached) {
             TtsTask task;
             task.id = next_task_id_++;
@@ -84,11 +84,11 @@ SubmitResult VoiceTtsService::submit(TtsRequest request) {
     return SubmitResult{true, {}, false, task};
 }
 
-bool VoiceTtsService::cancel_task(TtsTaskId task_id) {
+bool VoiceTtsService::cancelTask(TtsTaskId task_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = tasks_.find(task_id);
-    if (it == tasks_.end() || is_finished(it->second.status)) {
+    if (it == tasks_.end() || isFinished(it->second.status)) {
         return false;
     }
 
@@ -109,7 +109,7 @@ TickResult VoiceTtsService::tick(std::size_t max_tasks) {
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            auto maybe_task = take_next_task_locked(std::chrono::steady_clock::now());
+            auto maybe_task = takeNextTaskLocked(std::chrono::steady_clock::now());
             if (!maybe_task) {
                 break;
             }
@@ -130,13 +130,13 @@ TickResult VoiceTtsService::tick(std::size_t max_tasks) {
             std::chrono::steady_clock::now() - started_at);
 
         std::lock_guard<std::mutex> lock(mutex_);
-        finish_task_locked(running, std::move(response), elapsed, result);
+        finishTaskLocked(running, std::move(response), elapsed, result);
     }
 
     return result;
 }
 
-std::optional<TtsTask> VoiceTtsService::find_task(TtsTaskId task_id) const {
+std::optional<TtsTask> VoiceTtsService::findTask(TtsTaskId task_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = tasks_.find(task_id);
@@ -146,7 +146,7 @@ std::optional<TtsTask> VoiceTtsService::find_task(TtsTaskId task_id) const {
     return it->second;
 }
 
-std::optional<AudioResource> VoiceTtsService::find_audio(const std::string& audio_id) const {
+std::optional<AudioResource> VoiceTtsService::findAudio(const std::string& audio_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto key_it = audio_id_to_cache_key_.find(audio_id);
@@ -154,10 +154,10 @@ std::optional<AudioResource> VoiceTtsService::find_audio(const std::string& audi
         return std::nullopt;
     }
 
-    return find_cached_audio_locked(key_it->second, std::chrono::steady_clock::now());
+    return findCachedAudioLocked(key_it->second, std::chrono::steady_clock::now());
 }
 
-std::vector<TtsTask> VoiceTtsService::list_tasks() const {
+std::vector<TtsTask> VoiceTtsService::listTasks() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<TtsTask> tasks;
@@ -168,19 +168,19 @@ std::vector<TtsTask> VoiceTtsService::list_tasks() const {
     return tasks;
 }
 
-std::size_t VoiceTtsService::queued_task_count() const {
+std::size_t VoiceTtsService::queuedTaskCount() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return static_cast<std::size_t>(std::count_if(tasks_.begin(), tasks_.end(), [](const auto& item) {
         return item.second.status == TtsTaskStatus::queued;
     }));
 }
 
-std::size_t VoiceTtsService::cache_size() const {
+std::size_t VoiceTtsService::cacheSize() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return audio_cache_.size();
 }
 
-void VoiceTtsService::clear_expired_cache() {
+void VoiceTtsService::clearExpiredCache() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto now = std::chrono::steady_clock::now();
@@ -198,7 +198,7 @@ SubmitResult VoiceTtsService::reject(std::string error) const {
     return SubmitResult{false, std::move(error), false, std::nullopt};
 }
 
-std::string VoiceTtsService::build_cache_key(const TtsRequest& request) const {
+std::string VoiceTtsService::buildCacheKey(const TtsRequest& request) const {
     std::ostringstream oss;
     oss << request.text << '|'
         << request.voice.voice_id << '|'
@@ -206,17 +206,17 @@ std::string VoiceTtsService::build_cache_key(const TtsRequest& request) const {
         << request.voice.speed << '|'
         << request.voice.pitch << '|'
         << request.voice.volume << '|'
-        << to_string(request.format);
+        << toString(request.format);
 
     // 当前内存缓存使用进程内哈希；后续接入 Redis/文件缓存时可替换成稳定哈希。
     return "tts:" + std::to_string(std::hash<std::string>{}(oss.str()));
 }
 
-std::string VoiceTtsService::build_audio_id(const std::string& cache_key, TtsTaskId task_id) const {
+std::string VoiceTtsService::buildAudioId(const std::string& cache_key, TtsTaskId task_id) const {
     return cache_key + ":task:" + std::to_string(task_id);
 }
 
-std::optional<AudioResource> VoiceTtsService::find_cached_audio_locked(
+std::optional<AudioResource> VoiceTtsService::findCachedAudioLocked(
     const std::string& cache_key,
     std::chrono::steady_clock::time_point now) const {
     const auto it = audio_cache_.find(cache_key);
@@ -226,13 +226,13 @@ std::optional<AudioResource> VoiceTtsService::find_cached_audio_locked(
     return it->second;
 }
 
-void VoiceTtsService::store_cache_locked(const std::string& cache_key, const AudioResource& audio) {
+void VoiceTtsService::storeCacheLocked(const std::string& cache_key, const AudioResource& audio) {
     audio_cache_[cache_key] = audio;
     audio_id_to_cache_key_[audio.id] = cache_key;
-    enforce_cache_limit_locked();
+    enforceCacheLimitLocked();
 }
 
-void VoiceTtsService::enforce_cache_limit_locked() {
+void VoiceTtsService::enforceCacheLimitLocked() {
     while (audio_cache_.size() > config_.max_cache_items) {
         auto oldest = audio_cache_.begin();
         for (auto it = audio_cache_.begin(); it != audio_cache_.end(); ++it) {
@@ -246,7 +246,7 @@ void VoiceTtsService::enforce_cache_limit_locked() {
     }
 }
 
-std::optional<VoiceTtsService::RunningTask> VoiceTtsService::take_next_task_locked(
+std::optional<VoiceTtsService::RunningTask> VoiceTtsService::takeNextTaskLocked(
     std::chrono::steady_clock::time_point now) {
     auto selected = tasks_.end();
     for (auto it = tasks_.begin(); it != tasks_.end(); ++it) {
@@ -276,7 +276,7 @@ std::optional<VoiceTtsService::RunningTask> VoiceTtsService::take_next_task_lock
     return RunningTask{task, request};
 }
 
-TtsTask VoiceTtsService::finish_task_locked(const RunningTask& running,
+TtsTask VoiceTtsService::finishTaskLocked(const RunningTask& running,
                                             TtsProviderResponse response,
                                             std::chrono::milliseconds elapsed,
                                             TickResult& result) {
@@ -291,9 +291,9 @@ TtsTask VoiceTtsService::finish_task_locked(const RunningTask& running,
 
     if (response.ok && !response.bytes.empty()) {
         AudioResource audio;
-        audio.id = build_audio_id(task.cache_key, task.id);
+        audio.id = buildAudioId(task.cache_key, task.id);
         audio.format = response.format;
-        audio.mime_type = response.mime_type.empty() ? mime_type(response.format) : response.mime_type;
+        audio.mime_type = response.mime_type.empty() ? mimeType(response.format) : response.mime_type;
         audio.bytes = std::move(response.bytes);
         audio.duration = response.duration;
         audio.created_at = now;
@@ -306,7 +306,7 @@ TtsTask VoiceTtsService::finish_task_locked(const RunningTask& running,
         task.updated_at = now;
 
         if (task.request.cache_enabled) {
-            store_cache_locked(task.cache_key, audio);
+            storeCacheLocked(task.cache_key, audio);
         }
 
         result.succeeded_tasks.push_back(task);
@@ -314,7 +314,7 @@ TtsTask VoiceTtsService::finish_task_locked(const RunningTask& running,
     }
 
     task.last_error = response.error.empty() ? "TTS request failed" : response.error;
-    if (task.attempts < max_attempts_from_retries(config_.max_retries)) {
+    if (task.attempts < maxAttemptsFromRetries(config_.max_retries)) {
         task.status = TtsTaskStatus::queued;
         task.next_attempt_at = now + std::chrono::milliseconds(config_.retry_backoff.count() * task.attempts);
         task.updated_at = now;
@@ -328,7 +328,7 @@ TtsTask VoiceTtsService::finish_task_locked(const RunningTask& running,
     return task;
 }
 
-const char* to_string(AudioFormat format) {
+const char* toString(AudioFormat format) {
     switch (format) {
         case AudioFormat::wav:
             return "wav";
@@ -342,7 +342,7 @@ const char* to_string(AudioFormat format) {
     return "unknown";
 }
 
-const char* to_string(TtsTaskStatus status) {
+const char* toString(TtsTaskStatus status) {
     switch (status) {
         case TtsTaskStatus::queued:
             return "queued";
@@ -360,7 +360,7 @@ const char* to_string(TtsTaskStatus status) {
     return "unknown";
 }
 
-const char* mime_type(AudioFormat format) {
+const char* mimeType(AudioFormat format) {
     switch (format) {
         case AudioFormat::wav:
             return "audio/wav";

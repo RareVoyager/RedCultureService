@@ -11,10 +11,11 @@
 #include "rcs/voice_tts/voice_tts_service.hpp"
 
 #include <memory>
+#include <string>
 
 namespace rcs::application {
 
-// 应用层总配置，后面可以由 ConfigHotReloadService 从 YAML 中填充。
+// redculture_server 应用层配置，只服务当前可执行程序。
 struct ApplicationConfig {
     http::HttpServerConfig http;
     auth::AuthConfig auth;
@@ -22,14 +23,14 @@ struct ApplicationConfig {
     gameplay::CulturalInteractionConfig gameplay;
     ops::OpsConfig ops;
 
-    // 本地联调默认允许直接用 player_id 登录；上线前应改成 false，并接入账号系统或平台票据校验。
+    // 本地联调默认允许直接使用 player_id 登录；上线前应关闭并依赖 token 校验。
     bool allow_dev_auth{true};
 
-    // 默认不强制连接数据库；配置 RCS_POSTGRES_URI 后服务入口会打开它。
+    // 设置 RCS_POSTGRES_URI 或 --postgres-uri 后由入口打开数据库存储。
     bool enable_storage{false};
 };
 
-// 业务服务上下文。HTTP handler 通过它访问鉴权、房间、AI、运维等模块。
+// 应用层上下文，HTTP controller 通过它访问基础服务封装。
 struct ServiceContext {
     ApplicationConfig config;
     std::shared_ptr<auth::SessionAuthService> auth_service;
@@ -39,9 +40,12 @@ struct ServiceContext {
     std::shared_ptr<storage::StorageService> storage_service;
     std::shared_ptr<gameplay::CulturalInteractionService> gameplay_service;
     std::shared_ptr<ops::OpsService> ops_service;
+
+    // 保存启动时数据库连接错误，便于接口返回更具体的诊断信息。
+    std::string storage_startup_error;
 };
 
-// 主应用对象，负责组装模块、注册路由、启动/停止 HTTP 服务。
+// redculture_server 应用对象，负责组装服务、挂载路由并启动 HTTP 服务。
 class ServiceApplication {
 public:
     explicit ServiceApplication(ApplicationConfig config = {});
@@ -55,7 +59,7 @@ public:
 
     std::shared_ptr<ServiceContext> context() const;
     std::shared_ptr<http::HttpRouter> router() const;
-    bool is_running() const;
+    bool isRunning() const;
 
 private:
     std::shared_ptr<ServiceContext> context_;

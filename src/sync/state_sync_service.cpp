@@ -13,7 +13,7 @@ const SyncConfig& StateSyncService::config() const noexcept {
     return config_;
 }
 
-bool StateSyncService::register_room(RoomId room_id) {
+bool StateSyncService::registerRoom(RoomId room_id) {
     if (room_id == 0) {
         return false;
     }
@@ -23,12 +23,12 @@ bool StateSyncService::register_room(RoomId room_id) {
     return inserted;
 }
 
-bool StateSyncService::unregister_room(RoomId room_id) {
+bool StateSyncService::unregisterRoom(RoomId room_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     return rooms_.erase(room_id) > 0;
 }
 
-StateSubmitResult StateSyncService::add_player(RoomId room_id,
+StateSubmitResult StateSyncService::addPlayer(RoomId room_id,
                                                std::string player_id,
                                                std::uint64_t connection_id,
                                                PlayerTransform initial_transform) {
@@ -60,7 +60,7 @@ StateSubmitResult StateSyncService::add_player(RoomId room_id,
     return StateSubmitResult{true, {}, it->second, std::nullopt};
 }
 
-bool StateSyncService::remove_player(RoomId room_id, const std::string& player_id) {
+bool StateSyncService::removePlayer(RoomId room_id, const std::string& player_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -75,7 +75,7 @@ bool StateSyncService::remove_player(RoomId room_id, const std::string& player_i
     return removed;
 }
 
-bool StateSyncService::mark_player_offline(RoomId room_id, const std::string& player_id) {
+bool StateSyncService::markPlayerOffline(RoomId room_id, const std::string& player_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -94,7 +94,7 @@ bool StateSyncService::mark_player_offline(RoomId room_id, const std::string& pl
     return true;
 }
 
-StateSubmitResult StateSyncService::submit_state(const StateInput& input) {
+StateSubmitResult StateSyncService::submitState(const StateInput& input) {
     if (input.room_id == 0) {
         return reject("room_id is zero");
     }
@@ -121,14 +121,14 @@ StateSubmitResult StateSyncService::submit_state(const StateInput& input) {
     }
 
     const auto now = std::chrono::steady_clock::now();
-    if (!is_movement_allowed(state, input.transform, now)) {
+    if (!isMovementAllowed(state, input.transform, now)) {
         return reject("movement rejected by server authority");
     }
 
     return accept(room, state, input);
 }
 
-std::optional<PlayerState> StateSyncService::find_player_state(RoomId room_id, const std::string& player_id) const {
+std::optional<PlayerState> StateSyncService::findPlayerState(RoomId room_id, const std::string& player_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -144,7 +144,7 @@ std::optional<PlayerState> StateSyncService::find_player_state(RoomId room_id, c
     return player_it->second;
 }
 
-std::optional<StateSnapshot> StateSyncService::build_snapshot(RoomId room_id) const {
+std::optional<StateSnapshot> StateSyncService::buildSnapshot(RoomId room_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -152,10 +152,10 @@ std::optional<StateSnapshot> StateSyncService::build_snapshot(RoomId room_id) co
         return std::nullopt;
     }
 
-    return build_snapshot_locked(room_id, room_it->second);
+    return buildSnapshotLocked(room_id, room_it->second);
 }
 
-std::vector<StateSnapshot> StateSyncService::build_due_snapshots() {
+std::vector<StateSnapshot> StateSyncService::buildDueSnapshots() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<StateSnapshot> snapshots;
@@ -164,14 +164,14 @@ std::vector<StateSnapshot> StateSyncService::build_due_snapshots() {
     for (auto& [room_id, room] : rooms_) {
         if (now - room.last_snapshot_at >= config_.snapshot_interval) {
             room.last_snapshot_at = now;
-            snapshots.push_back(build_snapshot_locked(room_id, room));
+            snapshots.push_back(buildSnapshotLocked(room_id, room));
         }
     }
 
     return snapshots;
 }
 
-std::vector<StateDelta> StateSyncService::drain_deltas(RoomId room_id) {
+std::vector<StateDelta> StateSyncService::drainDeltas(RoomId room_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -184,12 +184,12 @@ std::vector<StateDelta> StateSyncService::drain_deltas(RoomId room_id) {
     return deltas;
 }
 
-std::size_t StateSyncService::room_count() const {
+std::size_t StateSyncService::roomCount() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return rooms_.size();
 }
 
-std::size_t StateSyncService::player_count(RoomId room_id) const {
+std::size_t StateSyncService::playerCount(RoomId room_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto room_it = rooms_.find(room_id);
@@ -235,7 +235,7 @@ StateSubmitResult StateSyncService::accept(RoomSyncState& room, PlayerState& sta
     return StateSubmitResult{true, {}, state, delta};
 }
 
-bool StateSyncService::is_movement_allowed(const PlayerState& current,
+bool StateSyncService::isMovementAllowed(const PlayerState& current,
                                            const PlayerTransform& next,
                                            std::chrono::steady_clock::time_point now) const {
     const auto moved = distance(current.transform.position, next.position);
@@ -253,7 +253,7 @@ bool StateSyncService::is_movement_allowed(const PlayerState& current,
     return moved <= allowed;
 }
 
-StateSnapshot StateSyncService::build_snapshot_locked(RoomId room_id, const RoomSyncState& room) const {
+StateSnapshot StateSyncService::buildSnapshotLocked(RoomId room_id, const RoomSyncState& room) const {
     StateSnapshot snapshot;
     snapshot.room_id = room_id;
     snapshot.version = room.version;

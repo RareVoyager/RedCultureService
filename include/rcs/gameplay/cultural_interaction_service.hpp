@@ -111,26 +111,30 @@ public:
     const CulturalInteractionConfig& config() const noexcept;
 
     // 玩家进入互动点时调用：校验房间成员身份，生成题目，并记录互动上下文。
-    StartInteractionResult start_interaction(const StartInteractionRequest& request);
+    StartInteractionResult startInteraction(const StartInteractionRequest& request);
 
     // 玩家提交答案时调用：生成 AI 讲解、生成 TTS 资源，并尽力写入 PostgreSQL。
-    SubmitAnswerResult submit_answer(const SubmitAnswerRequest& request);
+    SubmitAnswerResult submitAnswer(const SubmitAnswerRequest& request);
 
-    std::optional<InteractionSnapshot> find_interaction(InteractionId interaction_id) const;
-    std::optional<InteractionSnapshot> find_interaction_by_flow(ai_orchestrator::AiFlowId flow_id) const;
+    std::optional<InteractionSnapshot> findInteraction(InteractionId interaction_id) const;
+    std::optional<InteractionSnapshot> findInteractionByFlow(ai_orchestrator::AiFlowId flow_id) const;
 
 private:
     struct InteractionState {
         InteractionSnapshot snapshot;
+        std::int64_t storage_interaction_id{0};
+        std::int64_t audio_byte_size{0};
+        std::int64_t audio_duration_ms{0};
+        std::string audio_format{"mp3"};
         ai_orchestrator::AiTaskId question_task_id{0};
         ai_orchestrator::AiTaskId explanation_task_id{0};
         voice_tts::TtsTaskId tts_task_id{0};
     };
 
-    bool is_room_member(room::RoomId room_id, const std::string& player_id, std::string& error) const;
-    bool save_start_event(const InteractionState& state) const;
-    bool save_answer_event(const InteractionState& state, double score) const;
-    bool storage_available() const;
+    bool isRoomMember(room::RoomId room_id, const std::string& player_id, std::string& error) const;
+    storage::InsertResult saveStartEvent(const InteractionState& state) const;
+    bool saveAnswerEvent(const InteractionState& state, double score) const;
+    bool storageAvailable() const;
 
     std::shared_ptr<room::RoomMatchService> room_service_;
     std::shared_ptr<ai_orchestrator::AiOrchestratorService> ai_service_;

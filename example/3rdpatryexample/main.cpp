@@ -23,7 +23,7 @@
 
 namespace {
 
-void print_ok(const std::string& name, const std::string& detail)
+void printOk(const std::string& name, const std::string& detail)
 {
     std::cout << "[OK] " << name << ": " << detail << '\n';
 }
@@ -32,7 +32,7 @@ void print_ok(const std::string& name, const std::string& detail)
 
 int main(int argc, char** argv)
 {
-    // 统一验证所有 Conan 三方库是否可以被 CMake 找到、编译并链接。
+    // 统一验证 Conan 三方库是否能被 CMake 找到、编译并链接。
     ::testing::InitGoogleTest(&argc, argv);
     spdlog::info("3rdpatryexample unified smoke test start");
 
@@ -48,25 +48,25 @@ int main(int argc, char** argv)
                                .set_issuer("rcs")
                                .sign(jwt::algorithm::none{});
 
-    print_ok("boost", BOOST_LIB_VERSION);
-    print_ok("spdlog", "logger initialized");
-    print_ok("fmt", fmt::format("fmt {}", "loaded"));
-    print_ok("nlohmann_json", json_doc.dump());
-    print_ok("yaml-cpp", node["module"].as<std::string>());
-    print_ok("openssl", OpenSSL_version(OPENSSL_VERSION));
-    print_ok("protobuf", std::to_string(GOOGLE_PROTOBUF_VERSION));
-    print_ok("redis-plus-plus", "headers loaded");
-    print_ok("hiredis", std::to_string(HIREDIS_MAJOR) + "." + std::to_string(HIREDIS_MINOR));
-    print_ok("libpqxx", PQXX_VERSION);
-    print_ok("zlib", zlibVersion());
-    print_ok("prometheus-cpp", "registry constructed");
-    print_ok("jwt-cpp", jwt_token.empty() ? "empty token" : "token created");
-    print_ok("gtest", "framework initialized");
+    printOk("boost", BOOST_LIB_VERSION);
+    printOk("spdlog", "logger initialized");
+    printOk("fmt", fmt::format("fmt {}", "loaded"));
+    printOk("nlohmann_json", json_doc.dump());
+    printOk("yaml-cpp", node["module"].as<std::string>());
+    printOk("openssl", OpenSSL_version(OPENSSL_VERSION));
+    printOk("protobuf", std::to_string(GOOGLE_PROTOBUF_VERSION));
+    printOk("redis-plus-plus", "headers loaded");
+    printOk("hiredis", std::to_string(HIREDIS_MAJOR) + "." + std::to_string(HIREDIS_MINOR));
+    printOk("libpqxx", PQXX_VERSION);
+    printOk("zlib", zlibVersion());
+    printOk("prometheus-cpp", "registry constructed");
+    printOk("jwt-cpp", jwt_token.empty() ? "empty token" : "token created");
+    printOk("gtest", "framework initialized");
 
 #ifdef RCS_WITH_GRPC
-    print_ok("grpc", grpc::Version());
+    printOk("grpc", grpc::Version());
 #else
-    print_ok("grpc", "disabled by RCS_WITH_GRPC");
+    printOk("grpc", "disabled by RCS_WITH_GRPC");
 #endif
 
     return 0;

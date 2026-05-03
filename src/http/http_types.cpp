@@ -20,7 +20,7 @@ HttpResponse HttpResponse::text(int status_code, std::string body, std::string c
     return response;
 }
 
-HttpResponse HttpResponse::no_content()
+HttpResponse HttpResponse::noContent()
 {
     HttpResponse response;
     response.status_code = 204;
@@ -28,17 +28,17 @@ HttpResponse HttpResponse::no_content()
     return response;
 }
 
-HttpResponse HttpResponse::not_found()
+HttpResponse HttpResponse::notFound()
 {
     return text(404, "not found");
 }
 
-HttpResponse HttpResponse::bad_request(std::string message)
+HttpResponse HttpResponse::badRequest(std::string message)
 {
     return text(400, std::move(message));
 }
 
-HttpResponse HttpResponse::internal_error(std::string message)
+HttpResponse HttpResponse::internalError(std::string message)
 {
     return text(500, std::move(message));
 }

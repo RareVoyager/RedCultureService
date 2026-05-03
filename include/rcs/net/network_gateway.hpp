@@ -24,8 +24,7 @@ struct NetworkGatewayConfig {
     ConnectionOptions connection_options;
 };
 
-// 网络网关是网络接入层的公共入口。
-// 它负责接收 TCP 客户端、管理活跃连接，并向鉴权/会话/房间等上层模块暴露协议层回调。
+// 网络网关是网络接入层的公共入口，负责接收 TCP 客户端并管理活跃连接。
 class NetworkGateway {
 public:
     explicit NetworkGateway(NetworkGatewayConfig config = {});
@@ -36,11 +35,11 @@ public:
     void run();
     void poll();
 
-    bool is_running() const noexcept;
-    std::size_t connection_count() const;
+    bool isRunning() const noexcept;
+    std::size_t connectionCount() const;
     const NetworkGatewayConfig& config() const noexcept;
 
-    boost::asio::io_context& io_context() noexcept;
+    boost::asio::io_context& ioContext() noexcept;
 
     // 向指定连接发送消息。
     void send(ConnectionId id, const Message& message);
@@ -48,24 +47,23 @@ public:
     // 向所有活跃连接广播消息。
     void broadcast(const Message& message);
 
-    void set_on_connection_open(std::function<void(ConnectionId)> callback);
-    void set_on_message(std::function<void(ConnectionId, const Message&)> callback);
-    void set_on_connection_error(std::function<void(ConnectionId, const std::string&)> callback);
-    void set_on_connection_close(std::function<void(ConnectionId)> callback);
+    void setOnConnectionOpen(std::function<void(ConnectionId)> callback);
+    void setOnMessage(std::function<void(ConnectionId, const Message&)> callback);
+    void setOnConnectionError(std::function<void(ConnectionId, const std::string&)> callback);
+    void setOnConnectionClose(std::function<void(ConnectionId)> callback);
 
 private:
     using tcp = boost::asio::ip::tcp;
 
     // 持续接收新连接，直到 stop() 关闭 acceptor。
-    void accept_next();
-    void remove_connection(ConnectionId id);
+    void acceptNext();
+    void removeConnection(ConnectionId id);
 
     NetworkGatewayConfig config_;
     boost::asio::io_context io_context_;
     tcp::acceptor acceptor_;
 
-    // 所有连接表的读写都通过这个 strand 串行化。
-    // 后续即使用多个线程运行 io_context，也能保持连接管理逻辑安全。
+    // 所有连接表的读写都通过 strand 串行化。
     boost::asio::strand<boost::asio::io_context::executor_type> strand_;
     std::unordered_map<ConnectionId, std::shared_ptr<TcpConnection>> connections_;
     ConnectionCallbacks callbacks_;

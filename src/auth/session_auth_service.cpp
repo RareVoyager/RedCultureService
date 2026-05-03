@@ -2,7 +2,6 @@
 
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 
-#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -10,8 +9,9 @@ namespace rcs::auth {
 
 namespace {
 
-std::string claim_as_string(const jwt::decoded_jwt<jwt::traits::nlohmann_json>& token,
-                            const std::string& name) {
+std::string claimAsString(const jwt::decoded_jwt<jwt::traits::nlohmann_json>& token,
+                          const std::string& name)
+{
     if (!token.has_payload_claim(name)) {
         return {};
     }
@@ -21,19 +21,23 @@ std::string claim_as_string(const jwt::decoded_jwt<jwt::traits::nlohmann_json>& 
 } // namespace
 
 SessionAuthService::SessionAuthService(AuthConfig config)
-    : config_(std::move(config)) {}
+    : config_(std::move(config))
+{
+}
 
-const AuthConfig& SessionAuthService::config() const noexcept {
+const AuthConfig& SessionAuthService::config() const noexcept
+{
     return config_;
 }
 
-std::string SessionAuthService::issue_token(const std::string& player_id, const std::string& account) const {
+std::string SessionAuthService::issueToken(const std::string& player_id, const std::string& account) const
+{
     if (player_id.empty()) {
         throw std::invalid_argument("player_id is empty");
     }
 
     const auto now = std::chrono::system_clock::now();
-    const auto expires_at = now + config_.token_ttl;
+    const auto expiresAt = now + config_.token_ttl;
 
     // 当前使用 HS256，部署时需要把密钥放到配置或环境变量中。
     return jwt::create()
@@ -42,12 +46,13 @@ std::string SessionAuthService::issue_token(const std::string& player_id, const 
         .set_audience(config_.audience)
         .set_subject(player_id)
         .set_issued_at(now)
-        .set_expires_at(expires_at)
+        .set_expires_at(expiresAt)
         .set_payload_claim("account", jwt::claim(account))
         .sign(jwt::algorithm::hs256{config_.jwt_secret});
 }
 
-AuthResult SessionAuthService::validate_token(const std::string& token) const {
+AuthResult SessionAuthService::validateToken(const std::string& token) const
+{
     if (token.empty()) {
         return AuthResult{false, "token is empty", std::nullopt};
     }
@@ -55,7 +60,7 @@ AuthResult SessionAuthService::validate_token(const std::string& token) const {
     try {
         const auto decoded = jwt::decode(token);
 
-        // verifier 会校验签名、签发者、接收方和 exp 等标准字段。
+        // verifier 会校验签名、签发者、接收方、exp 等标准字段。
         jwt::verify()
             .allow_algorithm(jwt::algorithm::hs256{config_.jwt_secret})
             .with_issuer(config_.issuer)
@@ -64,7 +69,7 @@ AuthResult SessionAuthService::validate_token(const std::string& token) const {
 
         TokenClaims claims;
         claims.player_id = decoded.get_subject();
-        claims.account = claim_as_string(decoded, "account");
+        claims.account = claimAsString(decoded, "account");
         claims.issued_at = decoded.get_issued_at();
         claims.expires_at = decoded.get_expires_at();
 
@@ -78,17 +83,19 @@ AuthResult SessionAuthService::validate_token(const std::string& token) const {
     }
 }
 
-LoginResult SessionAuthService::login_with_token(const std::string& token, std::uint64_t connection_id) {
-    const auto auth = validate_token(token);
+LoginResult SessionAuthService::loginWithToken(const std::string& token, std::uint64_t connection_id)
+{
+    const auto auth = validateToken(token);
     if (!auth.ok || !auth.claims) {
         return LoginResult{false, auth.error, std::nullopt};
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
-    return LoginResult{true, {}, upsert_session(*auth.claims, connection_id)};
+    return LoginResult{true, {}, upsertSession(*auth.claims, connection_id)};
 }
 
-std::optional<Session> SessionAuthService::find_session(SessionId session_id) const {
+std::optional<Session> SessionAuthService::findSession(SessionId session_id) const
+{
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = sessions_.find(session_id);
     if (it == sessions_.end()) {
@@ -97,32 +104,35 @@ std::optional<Session> SessionAuthService::find_session(SessionId session_id) co
     return it->second;
 }
 
-std::optional<Session> SessionAuthService::find_session_by_player(const std::string& player_id) const {
+std::optional<Session> SessionAuthService::findSessionByPlayer(const std::string& player_id) const
+{
     std::lock_guard<std::mutex> lock(mutex_);
-    const auto id_it = player_sessions_.find(player_id);
-    if (id_it == player_sessions_.end()) {
+    const auto idIt = player_sessions_.find(player_id);
+    if (idIt == player_sessions_.end()) {
         return std::nullopt;
     }
 
-    const auto session_it = sessions_.find(id_it->second);
-    if (session_it == sessions_.end()) {
+    const auto sessionIt = sessions_.find(idIt->second);
+    if (sessionIt == sessions_.end()) {
         return std::nullopt;
     }
-    return session_it->second;
+    return sessionIt->second;
 }
 
-bool SessionAuthService::touch_session(SessionId session_id) {
+bool SessionAuthService::touchSession(SessionId session_id)
+{
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = sessions_.find(session_id);
     if (it == sessions_.end()) {
         return false;
     }
 
-    it->second.last_seen_at = std::chrono::steady_clock::now();
+    it->second.lastSeenAt = std::chrono::steady_clock::now();
     return true;
 }
 
-bool SessionAuthService::close_session(SessionId session_id) {
+bool SessionAuthService::closeSession(SessionId session_id)
+{
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = sessions_.find(session_id);
     if (it == sessions_.end()) {
@@ -134,12 +144,13 @@ bool SessionAuthService::close_session(SessionId session_id) {
     return true;
 }
 
-void SessionAuthService::sweep_expired_sessions() {
+void SessionAuthService::sweepExpiredSessions()
+{
     std::lock_guard<std::mutex> lock(mutex_);
     const auto now = std::chrono::steady_clock::now();
 
     for (auto it = sessions_.begin(); it != sessions_.end();) {
-        if (is_session_expired(it->second, now)) {
+        if (isSessionExpired(it->second, now)) {
             player_sessions_.erase(it->second.player_id);
             it = sessions_.erase(it);
         } else {
@@ -148,19 +159,22 @@ void SessionAuthService::sweep_expired_sessions() {
     }
 }
 
-std::size_t SessionAuthService::session_count() const {
+std::size_t SessionAuthService::sessionCount() const
+{
     std::lock_guard<std::mutex> lock(mutex_);
     return sessions_.size();
 }
 
-bool SessionAuthService::is_session_expired(const Session& session,
-                                            std::chrono::steady_clock::time_point now) const {
-    const auto idle_expired = now - session.last_seen_at > config_.session_idle_timeout;
-    const auto token_expired = std::chrono::system_clock::now() >= session.token_expires_at;
-    return idle_expired || token_expired;
+bool SessionAuthService::isSessionExpired(const Session& session,
+                                          std::chrono::steady_clock::time_point now) const
+{
+    const auto idleExpired = now - session.lastSeenAt > config_.session_idle_timeout;
+    const auto tokenExpired = std::chrono::system_clock::now() >= session.token_expires_at;
+    return idleExpired || tokenExpired;
 }
 
-Session SessionAuthService::upsert_session(const TokenClaims& claims, std::uint64_t connection_id) {
+Session SessionAuthService::upsertSession(const TokenClaims& claims, std::uint64_t connection_id)
+{
     const auto now = std::chrono::steady_clock::now();
     const auto existing = player_sessions_.find(claims.player_id);
 
@@ -168,7 +182,7 @@ Session SessionAuthService::upsert_session(const TokenClaims& claims, std::uint6
         auto& session = sessions_.at(existing->second);
         session.account = claims.account;
         session.connection_id = connection_id;
-        session.last_seen_at = now;
+        session.lastSeenAt = now;
         session.token_expires_at = claims.expires_at;
         return session;
     }
@@ -179,7 +193,7 @@ Session SessionAuthService::upsert_session(const TokenClaims& claims, std::uint6
     session.account = claims.account;
     session.connection_id = connection_id;
     session.created_at = now;
-    session.last_seen_at = now;
+    session.lastSeenAt = now;
     session.token_expires_at = claims.expires_at;
 
     player_sessions_[session.player_id] = session.id;

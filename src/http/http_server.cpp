@@ -24,7 +24,7 @@ namespace beast = boost::beast;
 namespace beast_http = boost::beast::http;
 using tcp = asio::ip::tcp;
 
-std::pair<std::string, std::string> split_target(const std::string& target)
+std::pair<std::string, std::string> splitTarget(const std::string& target)
 {
     const auto pos = target.find('?');
     if (pos == std::string::npos) {
@@ -33,19 +33,19 @@ std::pair<std::string, std::string> split_target(const std::string& target)
     return {target.substr(0, pos), target.substr(pos + 1)};
 }
 
-std::string endpoint_to_string(const tcp::endpoint& endpoint)
+std::string endpointToString(const tcp::endpoint& endpoint)
 {
     return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
 }
 
-void log_access(const beast_http::request<beast_http::string_body>& request,
+void logAccess(const beast_http::request<beast_http::string_body>& request,
                 const tcp::endpoint& remote_endpoint,
                 int status_code,
                 std::chrono::milliseconds elapsed)
 {
     const auto method = std::string(request.method_string());
     const auto target = std::string(request.target());
-    const auto remote = endpoint_to_string(remote_endpoint);
+    const auto remote = endpointToString(remote_endpoint);
 
     if (status_code >= 500) {
         spdlog::error("http_access method={} target={} status={} elapsed_ms={} remote={}",
@@ -75,18 +75,18 @@ void log_access(const beast_http::request<beast_http::string_body>& request,
                  remote);
 }
 
-HttpRequest to_http_request(const beast_http::request<beast_http::string_body>& request,
+HttpRequest toHttpRequest(const beast_http::request<beast_http::string_body>& request,
                             const tcp::endpoint& remote_endpoint)
 {
     HttpRequest converted;
     converted.method = std::string(request.method_string());
     converted.target = std::string(request.target());
 
-    auto [path, query] = split_target(converted.target);
+    auto [path, query] = splitTarget(converted.target);
     converted.path = std::move(path);
     converted.query = std::move(query);
     converted.body = request.body();
-    converted.remote_address = remote_endpoint.address().to_string();
+    converted.remoteAddress = remote_endpoint.address().to_string();
     converted.remote_port = remote_endpoint.port();
 
     for (const auto& field : request) {
@@ -96,7 +96,7 @@ HttpRequest to_http_request(const beast_http::request<beast_http::string_body>& 
     return converted;
 }
 
-beast_http::response<beast_http::string_body> to_beast_response(const HttpResponse& response,
+beast_http::response<beast_http::string_body> toBeastResponse(const HttpResponse& response,
                                                                 unsigned version,
                                                                 bool keep_alive,
                                                                 bool enable_cors)
@@ -113,7 +113,7 @@ beast_http::response<beast_http::string_body> to_beast_response(const HttpRespon
         converted.set(name, value);
     }
 
-    // Unity WebGL 会经过浏览器 CORS 校验，普通桌面/移动端 Unity 不依赖它；默认打开能减少前端联调摩擦。
+    // Unity WebGL 会经过浏览器 CORS 校验；桌面和移动端 Unity 不依赖它。
     if (enable_cors) {
         converted.set("Access-Control-Allow-Origin", "*");
         converted.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -137,30 +137,30 @@ public:
 
     void run()
     {
-        read_request();
+        readRequest();
     }
 
 private:
-    void read_request()
+    void readRequest()
     {
         parser_ = std::make_unique<beast_http::request_parser<beast_http::string_body>>();
         parser_->body_limit(config_.max_body_bytes);
 
         auto self = shared_from_this();
         beast_http::async_read(socket_, buffer_, *parser_, [self](beast::error_code error, std::size_t) {
-            self->on_read(error);
+            self->onRead(error);
         });
     }
 
-    void on_read(beast::error_code error)
+    void onRead(beast::error_code error)
     {
         if (error == beast_http::error::end_of_stream) {
-            close_socket();
+            closeSocket();
             return;
         }
 
         if (error) {
-            close_socket();
+            closeSocket();
             return;
         }
 
@@ -176,34 +176,34 @@ private:
 
         HttpResponse response;
         if (request.method() == beast_http::verb::options) {
-            response = HttpResponse::no_content();
+            response = HttpResponse::noContent();
         } else {
             try {
-                response = router_->route(to_http_request(request, remote_endpoint));
+                response = router_->route(toHttpRequest(request, remote_endpoint));
             } catch (const std::exception& ex) {
                 spdlog::error("http_handler_exception location={}:{} function={} msg={}",
                               __FILE__,
                               __LINE__,
                               __func__,
                               ex.what());
-                response = HttpResponse::internal_error(ex.what());
+                response = HttpResponse::internalError(ex.what());
             } catch (...) {
                 spdlog::error("http_handler_exception location={}:{} function={} msg=unknown server error",
                               __FILE__,
                               __LINE__,
                               __func__);
-                response = HttpResponse::internal_error("unknown server error");
+                response = HttpResponse::internalError("unknown server error");
             }
         }
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - started_at);
-        log_access(request, remote_endpoint, response.status_code, elapsed);
+        logAccess(request, remote_endpoint, response.status_code, elapsed);
 
-        write_response(to_beast_response(response, request.version(), request.keep_alive(), config_.enable_cors));
+        writeResponse(toBeastResponse(response, request.version(), request.keep_alive(), config_.enable_cors));
     }
 
-    void write_response(beast_http::response<beast_http::string_body> response)
+    void writeResponse(beast_http::response<beast_http::string_body> response)
     {
         auto shared_response = std::make_shared<beast_http::response<beast_http::string_body>>(std::move(response));
         const auto close_after_write = shared_response->need_eof();
@@ -212,15 +212,15 @@ private:
         beast_http::async_write(socket_, *shared_response, [self, shared_response, close_after_write](beast::error_code error,
                                                                                                       std::size_t) {
             if (error || close_after_write) {
-                self->close_socket();
+                self->closeSocket();
                 return;
             }
 
-            self->read_request();
+            self->readRequest();
         });
     }
 
-    void close_socket()
+    void closeSocket()
     {
         beast::error_code ignored;
         socket_.shutdown(tcp::socket::shutdown_send, ignored);
@@ -291,7 +291,7 @@ public:
             throw std::runtime_error("listen failed: " + error.message());
         }
 
-        accept_next();
+        acceptNext();
 
         const auto thread_count = std::max<std::size_t>(1, config_.thread_count);
         threads_.reserve(thread_count);
@@ -319,13 +319,13 @@ public:
         threads_.clear();
     }
 
-    bool is_running() const
+    bool isRunning() const
     {
         return running_.load();
     }
 
 private:
-    void accept_next()
+    void acceptNext()
     {
         acceptor_.async_accept(asio::make_strand(io_context_), [this](beast::error_code error, tcp::socket socket) {
             if (!running_) {
@@ -336,7 +336,7 @@ private:
                 std::make_shared<HttpSession>(std::move(socket), router_, config_)->run();
             }
 
-            accept_next();
+            acceptNext();
         });
     }
 
@@ -365,9 +365,9 @@ void HttpServer::stop()
     impl_->stop();
 }
 
-bool HttpServer::is_running() const
+bool HttpServer::isRunning() const
 {
-    return impl_->is_running();
+    return impl_->isRunning();
 }
 
 } // namespace rcs::http

@@ -9,29 +9,29 @@
 namespace rcs::gameplay {
 namespace {
 
-bool contains_player(const room::RoomInfo& room_info, const std::string& player_id)
+bool containsPlayer(const room::RoomInfo& roomInfo, const std::string& playerId)
 {
-    return std::any_of(room_info.members.begin(), room_info.members.end(), [&](const room::RoomMember& member) {
-        return member.player.player_id == player_id;
+    return std::any_of(roomInfo.members.begin(), roomInfo.members.end(), [&](const room::RoomMember& member) {
+        return member.player.player_id == playerId;
     });
 }
 
-std::string fallback_question(const StartInteractionRequest& request)
+std::string fallbackQuestion(const StartInteractionRequest& request)
 {
     if (!request.topic.empty()) {
-        return "请围绕「" + request.topic + "」说说你的观察和理解。";
+        return "请围绕《" + request.topic + "》说说你的观察和理解。";
     }
     return "请说说你在当前红色文化场景中的观察和理解。";
 }
 
-std::string fallback_explanation(const SubmitAnswerRequest& request)
+std::string fallbackExplanation(const SubmitAnswerRequest& request)
 {
     return "讲解生成中。你的回答是：" + request.answer;
 }
 
-double estimate_score(const std::string& answer)
+double estimateScore(const std::string& answer)
 {
-    // 当前先用简单启发式评分，后续可以换成 AI 判分或题库标准答案。
+    // 当前先用简单启发式评分，后续可以替换为 AI 判分或题库标准答案。
     if (answer.size() >= 36) {
         return 1.0;
     }
@@ -62,7 +62,7 @@ const CulturalInteractionConfig& CulturalInteractionService::config() const noex
     return config_;
 }
 
-StartInteractionResult CulturalInteractionService::start_interaction(const StartInteractionRequest& request)
+StartInteractionResult CulturalInteractionService::startInteraction(const StartInteractionRequest& request)
 {
     if (request.player_id.empty()) {
         return StartInteractionResult{false, "player_id is required"};
@@ -75,10 +75,10 @@ StartInteractionResult CulturalInteractionService::start_interaction(const Start
     }
 
     std::string room_error;
-    if (!is_room_member(request.room_id, request.player_id, room_error)) {
+    if (!isRoomMember(request.room_id, request.player_id, room_error)) {
         return StartInteractionResult{false, room_error};
     }
-    if (!config_.allow_without_storage && !storage_available()) {
+    if (!config_.allow_without_storage && !storageAvailable()) {
         return StartInteractionResult{false, "storage is not connected"};
     }
 
@@ -90,13 +90,13 @@ StartInteractionResult CulturalInteractionService::start_interaction(const Start
     ai_context.metadata = request.metadata;
     ai_context.metadata["trigger_id"] = request.trigger_id;
 
-    auto flow_result = ai_service_->start_question_flow(ai_context, request.question_prompt_template);
+    auto flow_result = ai_service_->startQuestionFlow(ai_context, request.question_prompt_template);
     if (!flow_result.ok || !flow_result.flow) {
         return StartInteractionResult{false, flow_result.error.empty() ? "failed to start ai interaction" : flow_result.error};
     }
 
     ai_service_->tick(config_.ai_tick_batch_size);
-    const auto latest_flow = ai_service_->find_flow(flow_result.flow->id).value_or(*flow_result.flow);
+    const auto latest_flow = ai_service_->findFlow(flow_result.flow->id).value_or(*flow_result.flow);
 
     InteractionState state;
     {
@@ -109,11 +109,13 @@ StartInteractionResult CulturalInteractionService::start_interaction(const Start
     state.snapshot.scene_id = request.scene_id;
     state.snapshot.trigger_id = request.trigger_id;
     state.snapshot.topic = ai_context.topic;
-    state.snapshot.question = latest_flow.generated_question.empty() ? fallback_question(request) : latest_flow.generated_question;
+    state.snapshot.question = latest_flow.generated_question.empty() ? fallbackQuestion(request) : latest_flow.generated_question;
     state.snapshot.completed = false;
     state.question_task_id = latest_flow.question_task_id;
 
-    const auto storage_saved = save_start_event(state);
+    const auto storage_start = saveStartEvent(state);
+    state.storage_interaction_id = storage_start.id;
+    const auto storage_saved = storage_start.ok;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -136,7 +138,7 @@ StartInteractionResult CulturalInteractionService::start_interaction(const Start
     return result;
 }
 
-SubmitAnswerResult CulturalInteractionService::submit_answer(const SubmitAnswerRequest& request)
+SubmitAnswerResult CulturalInteractionService::submitAnswer(const SubmitAnswerRequest& request)
 {
     if (request.player_id.empty()) {
         return SubmitAnswerResult{false, "player_id is required"};
@@ -144,7 +146,7 @@ SubmitAnswerResult CulturalInteractionService::submit_answer(const SubmitAnswerR
     if (request.answer.empty()) {
         return SubmitAnswerResult{false, "answer is required"};
     }
-    if (!config_.allow_without_storage && !storage_available()) {
+    if (!config_.allow_without_storage && !storageAvailable()) {
         return SubmitAnswerResult{false, "storage is not connected"};
     }
 
@@ -173,16 +175,16 @@ SubmitAnswerResult CulturalInteractionService::submit_answer(const SubmitAnswerR
         state = it->second;
     }
 
-    auto flow_result = ai_service_->submit_answer(state.snapshot.flow_id, request.answer);
+    auto flow_result = ai_service_->submitAnswer(state.snapshot.flow_id, request.answer);
     if (!flow_result.ok || !flow_result.flow) {
         return SubmitAnswerResult{false, flow_result.error.empty() ? "failed to submit answer" : flow_result.error};
     }
 
     ai_service_->tick(config_.ai_tick_batch_size);
-    const auto latest_flow = ai_service_->find_flow(state.snapshot.flow_id).value_or(*flow_result.flow);
+    const auto latest_flow = ai_service_->findFlow(state.snapshot.flow_id).value_or(*flow_result.flow);
 
     state.snapshot.answer = request.answer;
-    state.snapshot.explanation = latest_flow.generated_explanation.empty() ? fallback_explanation(request) : latest_flow.generated_explanation;
+    state.snapshot.explanation = latest_flow.generated_explanation.empty() ? fallbackExplanation(request) : latest_flow.generated_explanation;
     state.explanation_task_id = latest_flow.explanation_task_id;
 
     bool tts_cache_hit = false;
@@ -205,17 +207,20 @@ SubmitAnswerResult CulturalInteractionService::submit_answer(const SubmitAnswerR
                 tts_service_->tick(config_.tts_tick_batch_size);
             }
 
-            const auto latest_tts_task = tts_service_->find_task(state.tts_task_id).value_or(*tts_submit.task);
+            const auto latest_tts_task = tts_service_->findTask(state.tts_task_id).value_or(*tts_submit.task);
             if (latest_tts_task.audio) {
                 state.snapshot.audio_id = latest_tts_task.audio->id;
                 state.snapshot.audio_mime_type = latest_tts_task.audio->mime_type;
+                state.audio_format = voice_tts::toString(latest_tts_task.audio->format);
+                state.audio_byte_size = static_cast<std::int64_t>(latest_tts_task.audio->bytes.size());
+                state.audio_duration_ms = static_cast<std::int64_t>(latest_tts_task.audio->duration.count());
             }
         }
     }
 
     state.snapshot.completed = true;
-    const auto score = estimate_score(request.answer);
-    const auto storage_saved = save_answer_event(state, score);
+    const auto score = estimateScore(request.answer);
+    const auto storage_saved = saveAnswerEvent(state, score);
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -242,7 +247,7 @@ SubmitAnswerResult CulturalInteractionService::submit_answer(const SubmitAnswerR
     return result;
 }
 
-std::optional<InteractionSnapshot> CulturalInteractionService::find_interaction(InteractionId interaction_id) const
+std::optional<InteractionSnapshot> CulturalInteractionService::findInteraction(InteractionId interaction_id) const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = interactions_.find(interaction_id);
@@ -252,7 +257,7 @@ std::optional<InteractionSnapshot> CulturalInteractionService::find_interaction(
     return it->second.snapshot;
 }
 
-std::optional<InteractionSnapshot> CulturalInteractionService::find_interaction_by_flow(
+std::optional<InteractionSnapshot> CulturalInteractionService::findInteractionByFlow(
     ai_orchestrator::AiFlowId flow_id) const
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -268,7 +273,7 @@ std::optional<InteractionSnapshot> CulturalInteractionService::find_interaction_
     return interaction_it->second.snapshot;
 }
 
-bool CulturalInteractionService::is_room_member(room::RoomId room_id,
+bool CulturalInteractionService::isRoomMember(room::RoomId room_id,
                                                 const std::string& player_id,
                                                 std::string& error) const
 {
@@ -281,13 +286,13 @@ bool CulturalInteractionService::is_room_member(room::RoomId room_id,
         return false;
     }
 
-    const auto room_info = room_service_->find_room(room_id);
+    const auto room_info = room_service_->findRoom(room_id);
     if (!room_info) {
         error = "room was not found";
         return false;
     }
 
-    if (!contains_player(*room_info, player_id)) {
+    if (!containsPlayer(*room_info, player_id)) {
         error = "player is not in the room";
         return false;
     }
@@ -295,33 +300,65 @@ bool CulturalInteractionService::is_room_member(room::RoomId room_id,
     return true;
 }
 
-bool CulturalInteractionService::save_start_event(const InteractionState& state) const
+storage::InsertResult CulturalInteractionService::saveStartEvent(const InteractionState& state) const
 {
-    if (!storage_available()) {
-        return false;
+    if (!storageAvailable()) {
+        return storage::InsertResult{false, "storage is not connected", 0};
     }
 
+    storage::UserProfile profile;
+    profile.player_id = state.snapshot.player_id;
+    profile.account = state.snapshot.player_id;
+    profile.display_name = state.snapshot.player_id;
+    profile.metadata = {{"source", "gameplay"}};
+    const auto user_saved = storage_service_->findUser(state.snapshot.player_id)
+                                ? storage::StorageResult{true, {}}
+                                : storage_service_->upsertUser(profile);
+    if (!user_saved.ok) {
+        return storage::InsertResult{false, user_saved.error, 0};
+    }
+
+    storage::CulturalInteractionRecord interaction;
+    interaction.service_interaction_id = state.snapshot.interaction_id;
+    interaction.player_id = state.snapshot.player_id;
+    interaction.room_id = state.snapshot.room_id;
+    interaction.scene_id = state.snapshot.scene_id;
+    interaction.trigger_id = state.snapshot.trigger_id;
+    interaction.interaction_type = "qa";
+    interaction.ai_flow_id = state.snapshot.flow_id;
+    interaction.topic = state.snapshot.topic;
+    interaction.question = state.snapshot.question;
+    interaction.status = "started";
+    interaction.metadata = {
+        {"question_task_id", state.question_task_id},
+        {"source", "gameplay.startInteraction"},
+    };
+    const auto interaction_inserted = storage_service_->startCulturalInteraction(interaction);
+
     storage::EventLog event;
-    event.level = "info";
+    event.level = interaction_inserted.ok ? "info" : "warn";
     event.category = "gameplay.interaction";
     event.message = "cultural interaction started";
     event.metadata = {
         {"interaction_id", state.snapshot.interaction_id},
+        {"storage_interaction_id", interaction_inserted.id},
         {"flow_id", state.snapshot.flow_id},
         {"player_id", state.snapshot.player_id},
         {"room_id", state.snapshot.room_id},
         {"scene_id", state.snapshot.scene_id},
         {"trigger_id", state.snapshot.trigger_id},
         {"topic", state.snapshot.topic},
+        {"interaction_saved", interaction_inserted.ok},
+        {"storage_error", interaction_inserted.error},
     };
+    storage_service_->appendEventLog(event);
 
-    const auto inserted = storage_service_->append_event_log(event);
-    return inserted.ok;
+    return interaction_inserted;
 }
 
-bool CulturalInteractionService::save_answer_event(const InteractionState& state, double score) const
+bool CulturalInteractionService::saveAnswerEvent(const InteractionState& state, double score) const
 {
-    if (!storage_available()) {
+    if (!storageAvailable()) {
         return false;
     }
 
@@ -330,9 +367,12 @@ bool CulturalInteractionService::save_answer_event(const InteractionState& state
     profile.account = state.snapshot.player_id;
     profile.display_name = state.snapshot.player_id;
     profile.metadata = {{"source", "gameplay"}};
-    storage_service_->upsert_user(profile);
+    if (!storage_service_->findUser(state.snapshot.player_id)) {
+        storage_service_->upsertUser(profile);
+    }
 
     storage::AnswerRecord answer;
+    answer.interaction_id = state.storage_interaction_id;
     answer.player_id = state.snapshot.player_id;
     answer.question_id = state.snapshot.trigger_id.empty()
                              ? std::to_string(state.snapshot.flow_id)
@@ -350,7 +390,46 @@ bool CulturalInteractionService::save_answer_event(const InteractionState& state
         {"explanation", state.snapshot.explanation},
         {"audio_id", state.snapshot.audio_id},
     };
-    const auto answer_inserted = storage_service_->append_answer_record(answer);
+    const auto answer_inserted = storage_service_->appendAnswerRecord(answer);
+
+    storage::CulturalInteractionRecord completed_interaction;
+    completed_interaction.id = state.storage_interaction_id;
+    completed_interaction.ai_flow_id = state.snapshot.flow_id;
+    completed_interaction.answer = state.snapshot.answer;
+    completed_interaction.explanation = state.snapshot.explanation;
+    completed_interaction.audio_id = state.snapshot.audio_id;
+    completed_interaction.status = "completed";
+    completed_interaction.score = score;
+    completed_interaction.metadata = {
+        {"answer_record_id", answer_inserted.id},
+        {"explanation_task_id", state.explanation_task_id},
+        {"tts_task_id", state.tts_task_id},
+    };
+    const auto interaction_updated = state.storage_interaction_id > 0
+                                         ? storage_service_->completeCulturalInteraction(completed_interaction)
+                                         : storage::StorageResult{false, "interaction was not persisted at start"};
+
+    storage::StorageResult tts_saved{true, {}};
+    if (!state.snapshot.audio_id.empty()) {
+        storage::TtsAudioResourceRecord audio;
+        audio.audio_id = state.snapshot.audio_id;
+        audio.player_id = state.snapshot.player_id;
+        audio.interaction_id = state.storage_interaction_id;
+        audio.mime_type = state.snapshot.audio_mime_type.empty() ? "audio/mpeg" : state.snapshot.audio_mime_type;
+        audio.format = state.audio_format;
+        audio.byte_size = state.audio_byte_size;
+        audio.duration_ms = state.audio_duration_ms;
+        audio.storage_type = "memory";
+        audio.storage_uri = "/api/v1/tts/audio?audio_id=" + state.snapshot.audio_id;
+        audio.metadata = {
+            {"interaction_id", state.snapshot.interaction_id},
+            {"flow_id", state.snapshot.flow_id},
+            {"tts_task_id", state.tts_task_id},
+            {"scene_id", state.snapshot.scene_id},
+            {"trigger_id", state.snapshot.trigger_id},
+        };
+        tts_saved = storage_service_->saveTtsAudioResource(audio);
+    }
 
     storage::ProgressRecord progress;
     progress.player_id = state.snapshot.player_id;
@@ -362,28 +441,35 @@ bool CulturalInteractionService::save_answer_event(const InteractionState& state
         {"last_score", score},
         {"completed_interaction", true},
     };
-    const auto progress_saved = storage_service_->save_progress(progress);
+    const auto progress_saved = storage_service_->saveProgress(progress);
 
     storage::EventLog event;
-    event.level = answer_inserted.ok && progress_saved.ok ? "info" : "warn";
+    event.level = answer_inserted.ok && progress_saved.ok && interaction_updated.ok && tts_saved.ok ? "info" : "warn";
     event.category = "gameplay.interaction";
     event.message = "cultural interaction answered";
     event.metadata = {
         {"interaction_id", state.snapshot.interaction_id},
+        {"storage_interaction_id", state.storage_interaction_id},
         {"flow_id", state.snapshot.flow_id},
         {"player_id", state.snapshot.player_id},
         {"score", score},
+        {"interaction_updated", interaction_updated.ok},
         {"answer_saved", answer_inserted.ok},
         {"progress_saved", progress_saved.ok},
+        {"tts_saved", tts_saved.ok},
+        {"interaction_error", interaction_updated.error},
+        {"answer_error", answer_inserted.error},
+        {"progress_error", progress_saved.error},
+        {"tts_error", tts_saved.error},
     };
-    storage_service_->append_event_log(event);
+    storage_service_->appendEventLog(event);
 
-    return answer_inserted.ok && progress_saved.ok;
+    return answer_inserted.ok && progress_saved.ok && interaction_updated.ok && tts_saved.ok;
 }
 
-bool CulturalInteractionService::storage_available() const
+bool CulturalInteractionService::storageAvailable() const
 {
-    return storage_service_ && storage_service_->is_connected();
+    return storage_service_ && storage_service_->isConnected();
 }
 
 } // namespace rcs::gameplay

@@ -8,7 +8,7 @@ namespace rcs::ai_orchestrator {
 
 namespace {
 
-void replace_all(std::string& text, const std::string& from, const std::string& to) {
+void replaceAll(std::string& text, const std::string& from, const std::string& to) {
     if (from.empty()) {
         return;
     }
@@ -20,7 +20,7 @@ void replace_all(std::string& text, const std::string& from, const std::string& 
     }
 }
 
-std::uint32_t max_attempts_from_retries(std::uint32_t max_retries) {
+std::uint32_t maxAttemptsFromRetries(std::uint32_t max_retries) {
     return max_retries + 1;
 }
 
@@ -35,12 +35,12 @@ const AiOrchestratorConfig& AiOrchestratorService::config() const noexcept {
     return config_;
 }
 
-void AiOrchestratorService::set_client(std::shared_ptr<IAiClient> client) {
+void AiOrchestratorService::setClient(std::shared_ptr<IAiClient> client) {
     std::lock_guard<std::mutex> lock(mutex_);
     client_ = std::move(client);
 }
 
-bool AiOrchestratorService::register_trigger_rule(const TriggerRule& rule) {
+bool AiOrchestratorService::registerTriggerRule(const TriggerRule& rule) {
     if (rule.id.empty()) {
         return false;
     }
@@ -50,23 +50,23 @@ bool AiOrchestratorService::register_trigger_rule(const TriggerRule& rule) {
     return true;
 }
 
-bool AiOrchestratorService::remove_trigger_rule(const std::string& rule_id) {
+bool AiOrchestratorService::removeTriggerRule(const std::string& rule_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     return trigger_rules_.erase(rule_id) > 0;
 }
 
-std::vector<AiTask> AiOrchestratorService::handle_trigger_event(const TriggerEvent& event) {
+std::vector<AiTask> AiOrchestratorService::handleTriggerEvent(const TriggerEvent& event) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<AiTask> tasks;
     const auto now = std::chrono::steady_clock::now();
 
     for (const auto& [_, rule] : trigger_rules_) {
-        if (!rule_matches_event(rule, event)) {
+        if (!ruleMatchesEvent(rule, event)) {
             continue;
         }
 
-        const auto cooldown_key = trigger_cooldown_key(rule, event);
+        const auto cooldown_key = triggerCooldownKey(rule, event);
         const auto cooldown_it = last_triggered_at_.find(cooldown_key);
         if (cooldown_it != last_triggered_at_.end() && now - cooldown_it->second < rule.cooldown) {
             continue;
@@ -77,7 +77,7 @@ std::vector<AiTask> AiOrchestratorService::handle_trigger_event(const TriggerEve
             context.topic = rule.topic;
         }
 
-        auto enqueue = enqueue_task_locked(rule.task_kind, std::move(context), rule.prompt_template, std::nullopt);
+        auto enqueue = enqueueTaskLocked(rule.task_kind, std::move(context), rule.prompt_template, std::nullopt);
         if (enqueue.ok && enqueue.task) {
             last_triggered_at_[cooldown_key] = now;
             tasks.push_back(*enqueue.task);
@@ -87,7 +87,7 @@ std::vector<AiTask> AiOrchestratorService::handle_trigger_event(const TriggerEve
     return tasks;
 }
 
-FlowResult AiOrchestratorService::start_question_flow(AiContext context,
+FlowResult AiOrchestratorService::startQuestionFlow(AiContext context,
                                                       std::string question_prompt_template,
                                                       std::string explanation_prompt_template) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -103,7 +103,7 @@ FlowResult AiOrchestratorService::start_question_flow(AiContext context,
     flow.created_at = std::chrono::steady_clock::now();
     flow.updated_at = flow.created_at;
 
-    auto enqueue = enqueue_task_locked(AiTaskKind::generate_question,
+    auto enqueue = enqueueTaskLocked(AiTaskKind::generate_question,
                                        flow.context,
                                        flow.question_prompt_template,
                                        flow.id);
@@ -116,7 +116,7 @@ FlowResult AiOrchestratorService::start_question_flow(AiContext context,
     return FlowResult{true, {}, flow};
 }
 
-FlowResult AiOrchestratorService::submit_answer(AiFlowId flow_id, std::string answer) {
+FlowResult AiOrchestratorService::submitAnswer(AiFlowId flow_id, std::string answer) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto flow_it = flows_.find(flow_id);
@@ -135,7 +135,7 @@ FlowResult AiOrchestratorService::submit_answer(AiFlowId flow_id, std::string an
     flow.stage = AiFlowStage::generating_explanation;
     flow.updated_at = std::chrono::steady_clock::now();
 
-    auto enqueue = enqueue_task_locked(AiTaskKind::generate_explanation,
+    auto enqueue = enqueueTaskLocked(AiTaskKind::generate_explanation,
                                        flow.context,
                                        flow.explanation_prompt_template,
                                        flow.id);
@@ -149,14 +149,14 @@ FlowResult AiOrchestratorService::submit_answer(AiFlowId flow_id, std::string an
     return FlowResult{true, {}, flow};
 }
 
-EnqueueResult AiOrchestratorService::enqueue_task(AiTaskKind kind,
+EnqueueResult AiOrchestratorService::enqueueTask(AiTaskKind kind,
                                                   AiContext context,
                                                   std::string prompt_template) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return enqueue_task_locked(kind, std::move(context), std::move(prompt_template), std::nullopt);
+    return enqueueTaskLocked(kind, std::move(context), std::move(prompt_template), std::nullopt);
 }
 
-bool AiOrchestratorService::cancel_task(AiTaskId task_id) {
+bool AiOrchestratorService::cancelTask(AiTaskId task_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = tasks_.find(task_id);
@@ -184,7 +184,7 @@ TickResult AiOrchestratorService::tick(std::size_t max_tasks) {
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            auto maybe_task = take_next_task_locked(std::chrono::steady_clock::now());
+            auto maybe_task = takeNextTaskLocked(std::chrono::steady_clock::now());
             if (!maybe_task) {
                 break;
             }
@@ -204,13 +204,13 @@ TickResult AiOrchestratorService::tick(std::size_t max_tasks) {
             std::chrono::steady_clock::now() - started_at);
 
         std::lock_guard<std::mutex> lock(mutex_);
-        finish_task_locked(running, std::move(response), elapsed, result);
+        finishTaskLocked(running, std::move(response), elapsed, result);
     }
 
     return result;
 }
 
-std::optional<AiTask> AiOrchestratorService::find_task(AiTaskId task_id) const {
+std::optional<AiTask> AiOrchestratorService::findTask(AiTaskId task_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = tasks_.find(task_id);
@@ -220,7 +220,7 @@ std::optional<AiTask> AiOrchestratorService::find_task(AiTaskId task_id) const {
     return it->second;
 }
 
-std::optional<AiInteractionFlow> AiOrchestratorService::find_flow(AiFlowId flow_id) const {
+std::optional<AiInteractionFlow> AiOrchestratorService::findFlow(AiFlowId flow_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     const auto it = flows_.find(flow_id);
@@ -230,7 +230,7 @@ std::optional<AiInteractionFlow> AiOrchestratorService::find_flow(AiFlowId flow_
     return it->second;
 }
 
-std::vector<AiTask> AiOrchestratorService::list_tasks() const {
+std::vector<AiTask> AiOrchestratorService::listTasks() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<AiTask> tasks;
@@ -241,7 +241,7 @@ std::vector<AiTask> AiOrchestratorService::list_tasks() const {
     return tasks;
 }
 
-std::vector<AiInteractionFlow> AiOrchestratorService::list_flows() const {
+std::vector<AiInteractionFlow> AiOrchestratorService::listFlows() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<AiInteractionFlow> flows;
@@ -252,19 +252,19 @@ std::vector<AiInteractionFlow> AiOrchestratorService::list_flows() const {
     return flows;
 }
 
-std::size_t AiOrchestratorService::queued_task_count() const {
+std::size_t AiOrchestratorService::queuedTaskCount() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return static_cast<std::size_t>(std::count_if(tasks_.begin(), tasks_.end(), [](const auto& item) {
         return item.second.status == AiTaskStatus::queued;
     }));
 }
 
-std::size_t AiOrchestratorService::flow_count() const {
+std::size_t AiOrchestratorService::flowCount() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return flows_.size();
 }
 
-EnqueueResult AiOrchestratorService::enqueue_task_locked(AiTaskKind kind,
+EnqueueResult AiOrchestratorService::enqueueTaskLocked(AiTaskKind kind,
                                                          AiContext context,
                                                          std::string prompt_template,
                                                          std::optional<AiFlowId> flow_id) {
@@ -288,7 +288,7 @@ EnqueueResult AiOrchestratorService::enqueue_task_locked(AiTaskKind kind,
     task.status = AiTaskStatus::queued;
     task.context = std::move(context);
     task.prompt_template = std::move(prompt_template);
-    task.rendered_prompt = render_prompt(task.prompt_template, task.context);
+    task.rendered_prompt = renderPrompt(task.prompt_template, task.context);
     task.created_at = std::chrono::steady_clock::now();
     task.updated_at = task.created_at;
     task.next_attempt_at = task.created_at;
@@ -297,7 +297,7 @@ EnqueueResult AiOrchestratorService::enqueue_task_locked(AiTaskKind kind,
     return EnqueueResult{true, {}, task};
 }
 
-std::optional<AiOrchestratorService::RunningTask> AiOrchestratorService::take_next_task_locked(
+std::optional<AiOrchestratorService::RunningTask> AiOrchestratorService::takeNextTaskLocked(
     std::chrono::steady_clock::time_point now) {
     auto selected = tasks_.end();
     for (auto it = tasks_.begin(); it != tasks_.end(); ++it) {
@@ -329,7 +329,7 @@ std::optional<AiOrchestratorService::RunningTask> AiOrchestratorService::take_ne
     return RunningTask{task, request};
 }
 
-AiTask AiOrchestratorService::finish_task_locked(const RunningTask& running,
+AiTask AiOrchestratorService::finishTaskLocked(const RunningTask& running,
                                                  AiResponse response,
                                                  std::chrono::milliseconds elapsed,
                                                  TickResult& result) {
@@ -347,7 +347,7 @@ AiTask AiOrchestratorService::finish_task_locked(const RunningTask& running,
         task.response = std::move(response);
         task.last_error.clear();
         task.updated_at = now;
-        update_flow_after_task_locked(task);
+        updateFlowAfterTaskLocked(task);
         result.succeeded_tasks.push_back(task);
         return task;
     }
@@ -355,7 +355,7 @@ AiTask AiOrchestratorService::finish_task_locked(const RunningTask& running,
     task.last_error = response.error.empty() ? "AI request failed" : response.error;
     task.response = std::move(response);
 
-    if (task.attempts < max_attempts_from_retries(config_.max_retries)) {
+    if (task.attempts < maxAttemptsFromRetries(config_.max_retries)) {
         task.status = AiTaskStatus::queued;
         task.next_attempt_at = now + config_.retry_backoff * task.attempts;
         task.updated_at = now;
@@ -365,12 +365,12 @@ AiTask AiOrchestratorService::finish_task_locked(const RunningTask& running,
 
     task.status = timed_out ? AiTaskStatus::timed_out : AiTaskStatus::failed;
     task.updated_at = now;
-    update_flow_after_task_locked(task);
+    updateFlowAfterTaskLocked(task);
     result.failed_tasks.push_back(task);
     return task;
 }
 
-void AiOrchestratorService::update_flow_after_task_locked(const AiTask& task) {
+void AiOrchestratorService::updateFlowAfterTaskLocked(const AiTask& task) {
     if (!task.flow_id) {
         return;
     }
@@ -400,7 +400,7 @@ void AiOrchestratorService::update_flow_after_task_locked(const AiTask& task) {
     }
 }
 
-bool AiOrchestratorService::rule_matches_event(const TriggerRule& rule, const TriggerEvent& event) const {
+bool AiOrchestratorService::ruleMatchesEvent(const TriggerRule& rule, const TriggerEvent& event) const {
     if (!rule.enabled || rule.type != event.type) {
         return false;
     }
@@ -410,30 +410,30 @@ bool AiOrchestratorService::rule_matches_event(const TriggerRule& rule, const Tr
     return true;
 }
 
-std::string AiOrchestratorService::render_prompt(const std::string& prompt_template,
+std::string AiOrchestratorService::renderPrompt(const std::string& prompt_template,
                                                  const AiContext& context) const {
     std::string prompt = prompt_template;
-    replace_all(prompt, "{room_id}", std::to_string(context.room_id));
-    replace_all(prompt, "{player_id}", context.player_id);
-    replace_all(prompt, "{scene_id}", context.scene_id);
-    replace_all(prompt, "{topic}", context.topic);
-    replace_all(prompt, "{user_input}", context.user_input);
+    replaceAll(prompt, "{room_id}", std::to_string(context.room_id));
+    replaceAll(prompt, "{player_id}", context.player_id);
+    replaceAll(prompt, "{scene_id}", context.scene_id);
+    replaceAll(prompt, "{topic}", context.topic);
+    replaceAll(prompt, "{user_input}", context.user_input);
 
     for (const auto& [key, value] : context.metadata) {
-        replace_all(prompt, "{metadata." + key + "}", value);
+        replaceAll(prompt, "{metadata." + key + "}", value);
     }
 
     return prompt;
 }
 
-std::string AiOrchestratorService::trigger_cooldown_key(const TriggerRule& rule,
+std::string AiOrchestratorService::triggerCooldownKey(const TriggerRule& rule,
                                                         const TriggerEvent& event) const {
     std::ostringstream oss;
     oss << rule.id << ':' << event.context.room_id << ':' << event.context.player_id << ':' << event.context.scene_id;
     return oss.str();
 }
 
-const char* to_string(TriggerType type) {
+const char* toString(TriggerType type) {
     switch (type) {
         case TriggerType::manual:
             return "manual";
@@ -447,7 +447,7 @@ const char* to_string(TriggerType type) {
     return "unknown";
 }
 
-const char* to_string(AiTaskKind kind) {
+const char* toString(AiTaskKind kind) {
     switch (kind) {
         case AiTaskKind::generate_question:
             return "generate_question";
@@ -459,7 +459,7 @@ const char* to_string(AiTaskKind kind) {
     return "unknown";
 }
 
-const char* to_string(AiTaskStatus status) {
+const char* toString(AiTaskStatus status) {
     switch (status) {
         case AiTaskStatus::queued:
             return "queued";
@@ -477,7 +477,7 @@ const char* to_string(AiTaskStatus status) {
     return "unknown";
 }
 
-const char* to_string(AiFlowStage stage) {
+const char* toString(AiFlowStage stage) {
     switch (stage) {
         case AiFlowStage::generating_question:
             return "generating_question";

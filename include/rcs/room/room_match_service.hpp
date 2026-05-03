@@ -25,7 +25,7 @@ struct PlayerRef {
     // 鉴权模块确认后的玩家 id。
     std::string player_id;
 
-    // 网络连接 id 由接入层传入，0 表示暂未绑定连接。
+    // 网络连接 id 由接入层传入；0 表示暂未绑定连接。
     std::uint64_t connection_id{0};
 };
 
@@ -90,39 +90,33 @@ class RoomMatchService {
 public:
     RoomMatchService() = default;
 
-    // 由玩家主动创建房间。
-    RoomResult create_room(const PlayerRef& host, const RoomOptions& options = {});
+    RoomResult createRoom(const PlayerRef& host, const RoomOptions& options = {});
+    RoomResult joinRoom(RoomId room_id, const PlayerRef& player);
+    RoomResult leaveRoom(RoomId room_id, const std::string& player_id);
+    RoomResult closeRoom(RoomId room_id);
+    RoomResult setReady(RoomId room_id, const std::string& player_id, bool ready);
 
-    // 玩家加入指定房间。
-    RoomResult join_room(RoomId room_id, const PlayerRef& player);
-
-    // 玩家离开房间；房间无人后会进入 closed 状态。
-    RoomResult leave_room(RoomId room_id, const std::string& player_id);
-
-    RoomResult close_room(RoomId room_id);
-    RoomResult set_ready(RoomId room_id, const std::string& player_id, bool ready);
-
-    std::optional<RoomInfo> find_room(RoomId room_id) const;
-    std::optional<RoomInfo> find_room_by_player(const std::string& player_id) const;
-    std::vector<RoomInfo> list_rooms(bool include_closed = false) const;
+    std::optional<RoomInfo> findRoom(RoomId room_id) const;
+    std::optional<RoomInfo> findRoomByPlayer(const std::string& player_id) const;
+    std::vector<RoomInfo> listRooms(bool include_closed = false) const;
 
     // 将玩家加入匹配队列。当前版本限制一个玩家只能持有一个匹配票据。
-    MatchTicketResult enqueue_match(const MatchRequest& request);
-    bool cancel_match(MatchTicketId ticket_id);
-    bool cancel_match_by_player(const std::string& player_id);
+    MatchTicketResult enqueueMatch(const MatchRequest& request);
+    bool cancelMatch(MatchTicketId ticket_id);
+    bool cancelMatchByPlayer(const std::string& player_id);
 
-    // 推进匹配队列：清理过期票据，并按模式/房间大小自动成房。
+    // 推进匹配队列：清理过期票据，并按模式和房间大小自动成房。
     MatchTickResult tick();
 
-    std::size_t room_count(bool include_closed = false) const;
-    std::size_t waiting_count(std::optional<std::string> mode = std::nullopt) const;
+    std::size_t roomCount(bool include_closed = false) const;
+    std::size_t waitingCount(std::optional<std::string> mode = std::nullopt) const;
 
 private:
-    RoomResult create_room_locked(const PlayerRef& host, const RoomOptions& options);
-    std::optional<RoomId> find_active_room_id_by_player_locked(const std::string& player_id) const;
-    void remove_player_ticket_locked(const std::string& player_id);
-    void update_room_state_locked(RoomInfo& room);
-    bool same_match_bucket(const MatchTicket& lhs, const MatchTicket& rhs) const;
+    RoomResult createRoomLocked(const PlayerRef& host, const RoomOptions& options);
+    std::optional<RoomId> findActiveRoomIdByPlayerLocked(const std::string& player_id) const;
+    void removePlayerTicketLocked(const std::string& player_id);
+    void updateRoomStateLocked(RoomInfo& room);
+    bool sameMatchBucket(const MatchTicket& lhs, const MatchTicket& rhs) const;
 
     mutable std::mutex mutex_;
     RoomId next_room_id_{1};
@@ -132,6 +126,6 @@ private:
     std::unordered_map<std::string, MatchTicketId> player_tickets_;
 };
 
-const char* to_string(RoomState state);
+const char* toString(RoomState state);
 
 } // namespace rcs::room

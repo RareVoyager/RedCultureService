@@ -16,7 +16,7 @@ namespace {
 constexpr char BcryptBase64Alphabet[] =
     "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-std::string bcrypt_base64_encode(const unsigned char* data, std::size_t size)
+std::string bcryptBase64Encode(const unsigned char* data, std::size_t size)
 {
     std::string out;
     out.reserve(22);
@@ -48,14 +48,14 @@ std::string bcrypt_base64_encode(const unsigned char* data, std::size_t size)
         out.push_back(BcryptBase64Alphabet[c2 & 0x3f]);
     }
 
-    // bcrypt salt 固定 16 字节输入、22 字符输出。
+    // bcrypt salt 固定 16 字节输入，22 字符输出。
     if (out.size() > 22) {
         out.resize(22);
     }
     return out;
 }
 
-std::string make_bcrypt_salt(int cost)
+std::string makeBcryptSalt(int cost)
 {
     if (cost < 4 || cost > 31) {
         throw std::invalid_argument("bcrypt cost must be in range [4, 31]");
@@ -67,12 +67,12 @@ std::string make_bcrypt_salt(int cost)
         byte = static_cast<unsigned char>(random() & 0xffU);
     }
 
-    const auto encoded_salt = bcrypt_base64_encode(raw_salt.data(), raw_salt.size());
+    const auto encoded_salt = bcryptBase64Encode(raw_salt.data(), raw_salt.size());
     const auto cost_text = cost < 10 ? "0" + std::to_string(cost) : std::to_string(cost);
     return "$2b$" + cost_text + "$" + encoded_salt;
 }
 
-bool constant_time_equals(const std::string& lhs, const std::string& rhs)
+bool constantTimeEquals(const std::string& lhs, const std::string& rhs)
 {
     if (lhs.size() != rhs.size()) {
         return false;
@@ -85,7 +85,7 @@ bool constant_time_equals(const std::string& lhs, const std::string& rhs)
     return diff == 0;
 }
 
-std::string crypt_bcrypt(const std::string& password, const std::string& salt)
+std::string cryptBcrypt(const std::string& password, const std::string& salt)
 {
 #if defined(__linux__)
     struct crypt_data data {};
@@ -105,16 +105,16 @@ std::string crypt_bcrypt(const std::string& password, const std::string& salt)
 
 } // namespace
 
-std::string hash_password_bcrypt(const std::string& password, BcryptConfig config)
+std::string hashPasswordBcrypt(const std::string& password, BcryptConfig config)
 {
     if (password.empty()) {
         throw std::invalid_argument("password is empty");
     }
 
-    return crypt_bcrypt(password, make_bcrypt_salt(config.cost));
+    return cryptBcrypt(password, makeBcryptSalt(config.cost));
 }
 
-bool verify_password_bcrypt(const std::string& password, const std::string& password_hash)
+bool verifyPasswordBcrypt(const std::string& password, const std::string& password_hash)
 {
     if (password.empty() || password_hash.empty()) {
         return false;
@@ -124,7 +124,7 @@ bool verify_password_bcrypt(const std::string& password, const std::string& pass
     }
 
     try {
-        return constant_time_equals(crypt_bcrypt(password, password_hash), password_hash);
+        return constantTimeEquals(cryptBcrypt(password, password_hash), password_hash);
     } catch (...) {
         return false;
     }

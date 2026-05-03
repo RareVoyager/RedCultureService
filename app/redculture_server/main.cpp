@@ -1,42 +1,57 @@
-#include "rcs/application/service_application.hpp"
+#include "redculture_server/application/service_application.hpp"
 
-#include "rcs/api/server_routes.hpp"
+#include "rcs/config_hotreload/config_hotreload_service.hpp"
+#include "rcs/observability/telemetry_service.hpp"
 
 #include <boost/asio.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
+#include <memory>
+#include <optional>
+#include <stdexcept>
 #include <string>
-
-#include "rcs/observability/telemetry_service.hpp"
+#include <utility>
 
 namespace {
 
-    // 从环境变量中获取内容或是使用默认值
-std::string read_env_or(const char* name, std::string fallback)
+struct CliOptions {
+    std::optional<std::filesystem::path> config_path;
+    std::optional<std::string> host;
+    std::optional<std::uint16_t> port;
+    std::optional<std::string> postgres_uri;
+    bool prod_auth{false};
+};
+
+std::optional<std::string> readEnv(const std::string& name)
 {
-    const auto* value = std::getenv(name);
-    if (value == nullptr || std::string(value).empty()) {
-        return fallback;
+    if (name.empty()) {
+        return std::nullopt;
     }
-    return value;
+
+    const auto* value = std::getenv(name.c_str());
+    if (value == nullptr || std::string(value).empty()) {
+        return std::nullopt;
+    }
+    return std::string(value);
 }
 
-    // 是否存在环境变量
-bool has_env(const char* name)
+std::string readEnvOr(const std::string& name, std::string fallback)
 {
-    const auto* value = std::getenv(name);
-    return value != nullptr && !std::string(value).empty();
+    auto value = readEnv(name);
+    return value ? *value : std::move(fallback);
 }
 
-    // 检验端口号value 是否合法
-std::uint16_t parse_port(const std::string& value, std::uint16_t fallback)
+std::uint16_t parsePort(const std::string& value, std::uint16_t fallback)
 {
     try {
-        // string to unsigned long
         const auto port = std::stoul(value);
         if (port == 0 || port > 65535) {
             return fallback;
@@ -47,19 +62,172 @@ std::uint16_t parse_port(const std::string& value, std::uint16_t fallback)
     }
 }
 
-    // 解析启动程序时的参数
-void apply_cli_args(int argc, char** argv, rcs::application::ApplicationConfig& config)
+std::optional<std::uint16_t> parsePortArg(const std::string& value)
 {
+    try {
+        const auto port = std::stoul(value);
+        if (port == 0 || port > 65535) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint16_t>(port);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+// 命令行只做临时覆盖；常规运行参数由 YAML 配置文件管理。
+CliOptions parseCliOptions(int argc, char** argv)
+{
+    CliOptions options;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--host" && i + 1 < argc) {
-            config.http.listen_address = argv[++i];
+        if (arg == "--config" && i + 1 < argc) {
+            options.config_path = std::filesystem::path(argv[++i]);
+        } else if (arg == "--host" && i + 1 < argc) {
+            options.host = argv[++i];
         } else if (arg == "--port" && i + 1 < argc) {
-            config.http.listen_port = parse_port(argv[++i], config.http.listen_port);
+            options.port = parsePortArg(argv[++i]);
+        } else if (arg == "--postgres-uri" && i + 1 < argc) {
+            options.postgres_uri = argv[++i];
         } else if (arg == "--prod-auth") {
-            config.allow_dev_auth = false;
+            options.prod_auth = true;
         }
     }
+    return options;
+}
+
+std::optional<std::filesystem::path> existingPath(const std::filesystem::path& path)
+{
+    std::error_code ec;
+    if (std::filesystem::exists(path, ec)) {
+        return std::filesystem::weakly_canonical(path, ec);
+    }
+    return std::nullopt;
+}
+
+std::filesystem::path resolveConfigPath(const CliOptions& options, const char* argv0)
+{
+    if (options.config_path) {
+        return *options.config_path;
+    }
+
+    if (auto path = existingPath("config/app.yaml")) {
+        return *path;
+    }
+
+    if (argv0 != nullptr && std::string(argv0).size() > 0) {
+        std::error_code ec;
+        const auto executable_path = std::filesystem::absolute(argv0, ec);
+        const auto executable_dir = executable_path.parent_path();
+
+        if (auto path = existingPath(executable_dir / "config" / "app.yaml")) {
+            return *path;
+        }
+
+        // 兼容 CLion 常见目录：build/debug/app/redculture_server/redculture_server。
+        if (auto path = existingPath(executable_dir / ".." / ".." / ".." / ".." / "config" / "app.yaml")) {
+            return *path;
+        }
+    }
+
+    return "config/app.yaml";
+}
+
+std::string toLower(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+rcs::observability::LogLevel parseLogLevel(std::string level)
+{
+    level = toLower(std::move(level));
+    if (level == "trace") {
+        return rcs::observability::LogLevel::trace;
+    }
+    if (level == "debug") {
+        return rcs::observability::LogLevel::debug;
+    }
+    if (level == "warn" || level == "warning") {
+        return rcs::observability::LogLevel::warn;
+    }
+    if (level == "error") {
+        return rcs::observability::LogLevel::error;
+    }
+    if (level == "critical") {
+        return rcs::observability::LogLevel::critical;
+    }
+    return rcs::observability::LogLevel::info;
+}
+
+rcs::observability::TelemetryConfig toTelemetryConfig(const rcs::config_hotreload::AppConfig& file_config)
+{
+    rcs::observability::TelemetryConfig config;
+    config.serviceName = file_config.logging.service_name.empty()
+                             ? file_config.app.service_name
+                             : file_config.logging.service_name;
+    config.logger_name = file_config.logging.logger_name;
+    config.min_log_level = parseLogLevel(file_config.logging.level);
+    config.enable_console_log = file_config.logging.console;
+    config.enable_file_log = file_config.logging.file_enabled;
+    config.enable_json_log = file_config.logging.json;
+    config.file_path = file_config.logging.file_path;
+    config.pattern = file_config.logging.pattern;
+    return config;
+}
+
+rcs::application::ApplicationConfig toApplicationConfig(const rcs::config_hotreload::AppConfig& file_config,
+                                                        const CliOptions& options)
+{
+    rcs::application::ApplicationConfig config;
+
+    config.http.listen_address = file_config.server.listen_address;
+    config.http.listen_port = file_config.server.port;
+    config.http.thread_count = file_config.server.thread_count == 0 ? 1 : file_config.server.thread_count;
+    config.http.max_body_bytes = file_config.server.max_body_bytes;
+    config.http.enable_cors = file_config.server.enable_cors;
+
+    config.auth.issuer = file_config.auth.issuer;
+    config.auth.audience = file_config.auth.audience;
+    config.auth.jwt_secret = readEnvOr(file_config.auth.jwt_secret_env, file_config.auth.jwt_secret);
+    config.auth.token_ttl = std::chrono::seconds(file_config.auth.token_ttl_seconds);
+    config.auth.session_idle_timeout = std::chrono::seconds(file_config.auth.session_idle_timeout_seconds);
+
+    config.storage.connection_uri = readEnvOr(file_config.storage.postgres_uri_env, file_config.storage.postgres_uri);
+    config.storage.auto_migrate = file_config.storage.auto_migrate;
+    config.enable_storage = file_config.storage.enabled || readEnv(file_config.storage.postgres_uri_env).has_value();
+    config.gameplay.allow_without_storage = file_config.storage.allow_without_storage;
+
+    config.ops.serviceName = file_config.app.service_name;
+    config.ops.version = file_config.app.version;
+    config.ops.environment = readEnvOr("RCS_ENV", file_config.app.environment);
+    config.allow_dev_auth = file_config.app.allow_dev_auth;
+
+    // 兼容旧的环境变量；优先级：YAML < 环境变量 < 命令行。
+    if (auto host = readEnv("RCS_HTTP_HOST")) {
+        config.http.listen_address = *host;
+    }
+    if (auto port = readEnv("RCS_HTTP_PORT")) {
+        config.http.listen_port = parsePort(*port, config.http.listen_port);
+    }
+
+    if (options.host) {
+        config.http.listen_address = *options.host;
+    }
+    if (options.port) {
+        config.http.listen_port = *options.port;
+    }
+    if (options.postgres_uri) {
+        config.enable_storage = true;
+        config.storage.connection_uri = *options.postgres_uri;
+    }
+    if (options.prod_auth) {
+        config.allow_dev_auth = false;
+    }
+
+    return config;
 }
 
 } // namespace
@@ -67,50 +235,46 @@ void apply_cli_args(int argc, char** argv, rcs::application::ApplicationConfig& 
 int main(int argc, char** argv)
 {
     try {
-        rcs::application::ApplicationConfig config;
-        config.http.listen_address = read_env_or("RCS_HTTP_HOST", "0.0.0.0");
-        config.http.listen_port = parse_port(read_env_or("RCS_HTTP_PORT", "8080"), 8080);
-        config.auth.jwt_secret = read_env_or("RCS_JWT_SECRET", "local-dev-secret");
-        if (has_env("RCS_POSTGRES_URI")) {
-            config.enable_storage = true;
-            config.storage.connection_uri = read_env_or("RCS_POSTGRES_URI", config.storage.connection_uri);
+        const auto cli_options = parseCliOptions(argc, argv);
+        const auto config_path = resolveConfigPath(cli_options, argc > 0 ? argv[0] : nullptr);
+
+        rcs::config_hotreload::ConfigHotReloadService config_loader(config_path);
+        const auto load_result = config_loader.load();
+        if (!load_result.ok || !load_result.config) {
+            throw std::runtime_error("load config failed: " + config_path.string() + ": " + load_result.error);
         }
-        config.ops.service_name = "red_culture_service";
-        config.ops.version = "0.1.0";
-        config.ops.environment = read_env_or("RCS_ENV", "local");
-        rcs::observability::TelemetryConfig config1;
-        config1.service_name = "red_culture_service";
-        config1.min_log_level = rcs::observability::LogLevel::info;
-        config1.enable_json_log = false;
-        rcs::observability::TelemetryService telemetry(config1);
-        apply_cli_args(argc, argv, config);
+
+        auto telemetry = std::make_unique<rcs::observability::TelemetryService>(toTelemetryConfig(*load_result.config));
+        auto config = toApplicationConfig(*load_result.config, cli_options);
+
+        telemetry->info("config", "yaml config loaded", {
+            {"path", config_path.string()},
+            {"host", config.http.listen_address},
+            {"port", std::to_string(config.http.listen_port)},
+            {"storage_enabled", config.enable_storage ? "true" : "false"},
+        });
 
         rcs::application::ServiceApplication app(config);
-        rcs::api::register_server_routes(*app.router(), app.context());
         app.start();
 
-        telemetry.info("http", "request received", {
-            {"method", "GET"},
-            {"path", "/api/login"}
+        telemetry->info("server", "redculture_server started", {
+            {"host", config.http.listen_address},
+            {"port", std::to_string(config.http.listen_port)},
+            {"storage_enabled", config.enable_storage ? "true" : "false"},
         });
 
-        // std::cout << "RedCultureService HTTP server started at http://"
-        //           << config.http.listen_address << ':' << config.http.listen_port << '\n';
-        // std::cout << "Try: curl http://127.0.0.1:" << config.http.listen_port << "/api/v1/ops/health\n";
-        // std::cout << "Press Ctrl+C to stop.\n";
-
-        // 主线程只负责处理退出信号，HTTP 服务本身运行在 HttpServer 的工作线程中。
-        boost::asio::io_context signal_context;
-        boost::asio::signal_set signals(signal_context, SIGINT, SIGTERM);
+        // 主线程只处理退出信号，HTTP 服务运行在 HttpServer 的工作线程中。
+        boost::asio::io_context signalContext;
+        boost::asio::signal_set signals(signalContext, SIGINT, SIGTERM);
         signals.async_wait([&](const boost::system::error_code&, int) {
             app.stop();
-            signal_context.stop();
+            signalContext.stop();
         });
-        signal_context.run();
+        signalContext.run();
 
         return 0;
     } catch (const std::exception& ex) {
-        std::cerr << "redculture_server failed: " << ex.what() << '\n';
+        std::cerr << "redculture failed: " << ex.what() << '\n';
         return 1;
     }
 }

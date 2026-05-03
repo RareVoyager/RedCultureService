@@ -114,38 +114,38 @@ public:
         return msg_;
     }
 
-    bool has_data() const noexcept
+    bool hasData() const noexcept
     {
         return data_.has_value();
     }
 
-    const std::optional<T>& optional_data() const noexcept
+    const std::optional<T>& optionalData() const noexcept
     {
         return data_;
     }
 
     const T& data() const&
     {
-        ensure_data();
+        ensureData();
         return *data_;
     }
 
     T& data() &
     {
-        ensure_data();
+        ensureData();
         return *data_;
     }
 
     T&& data() &&
     {
-        ensure_data();
+        ensureData();
         return std::move(*data_);
     }
 
 private:
     Result() = default;
 
-    void ensure_data() const
+    void ensureData() const
     {
         if (!data_) {
             throw std::logic_error("Result does not contain data: " + std::to_string(code_) + " " + msg_);
@@ -157,7 +157,7 @@ private:
     std::optional<T> data_;
 };
 
-// void 特化：用于只关心 code/msg，不需要 data 的场景。
+// void �ػ�������ֻ���� code/msg������Ҫ data �ĳ�����
 template <>
 class Result<void> {
 public:

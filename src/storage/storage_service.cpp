@@ -18,20 +18,20 @@ StorageResult fail(const std::exception& e) {
     return StorageResult{false, e.what()};
 }
 
-nlohmann::json parse_json_or_empty(const std::string& text) {
+nlohmann::json parseJsonOrEmpty(const std::string& text) {
     if (text.empty()) {
         return nlohmann::json::object();
     }
     return nlohmann::json::parse(text);
 }
 
-void ensure_connected(const std::unique_ptr<pqxx::connection>& connection) {
+void ensureConnected(const std::unique_ptr<pqxx::connection>& connection) {
     if (!connection || !connection->is_open()) {
         throw std::runtime_error("PostgreSQL connection is not open");
     }
 }
 
-void run_initial_schema(pqxx::work& tx) {
+void runInitialSchema(pqxx::work& tx) {
     tx.exec(R"SQL(
         CREATE TABLE IF NOT EXISTS rcs_schema_migrations (
             version TEXT PRIMARY KEY,
@@ -73,7 +73,9 @@ void run_initial_schema(pqxx::work& tx) {
 
         CREATE TABLE IF NOT EXISTS rcs_cultural_interactions (
             id BIGSERIAL PRIMARY KEY,
+            service_interaction_id BIGINT NOT NULL DEFAULT 0,
             player_id TEXT NOT NULL REFERENCES rcs_users(player_id) ON DELETE CASCADE,
+            room_id BIGINT NOT NULL DEFAULT 0,
             scene_id TEXT NOT NULL DEFAULT '',
             trigger_id TEXT NOT NULL DEFAULT '',
             interaction_type TEXT NOT NULL DEFAULT 'qa',
@@ -93,6 +95,8 @@ void run_initial_schema(pqxx::work& tx) {
         );
 
         ALTER TABLE rcs_cultural_interactions
+            ADD COLUMN IF NOT EXISTS service_interaction_id BIGINT NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS room_id BIGINT NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS interaction_type TEXT NOT NULL DEFAULT 'qa',
             ADD COLUMN IF NOT EXISTS navigation_text TEXT NOT NULL DEFAULT '';
 
@@ -159,6 +163,9 @@ void run_initial_schema(pqxx::work& tx) {
 
         CREATE INDEX IF NOT EXISTS idx_rcs_interactions_player_started
             ON rcs_cultural_interactions(player_id, started_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_rcs_interactions_service_id
+            ON rcs_cultural_interactions(service_interaction_id);
 
         CREATE INDEX IF NOT EXISTS idx_rcs_interactions_scene_trigger
             ON rcs_cultural_interactions(scene_id, trigger_id, started_at DESC);
@@ -228,7 +235,7 @@ StorageResult StorageService::connect() {
 
         if (impl_->config.auto_migrate) {
             pqxx::work tx(*impl_->connection);
-            run_initial_schema(tx);
+            runInitialSchema(tx);
             tx.commit();
         }
 
@@ -244,7 +251,7 @@ void StorageService::disconnect() {
     impl_->connection.reset();
 }
 
-bool StorageService::is_connected() const {
+bool StorageService::isConnected() const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     return impl_->connection && impl_->connection->is_open();
 }
@@ -252,10 +259,10 @@ bool StorageService::is_connected() const {
 StorageResult StorageService::migrate() {
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
-        run_initial_schema(tx);
+        runInitialSchema(tx);
         tx.commit();
         return ok();
     } catch (const std::exception& e) {
@@ -263,7 +270,7 @@ StorageResult StorageService::migrate() {
     }
 }
 
-StorageResult StorageService::create_user(const UserProfile& profile) {
+StorageResult StorageService::createUser(const UserProfile& profile) {
     if (profile.player_id.empty()) {
         return StorageResult{false, "player_id is empty"};
     }
@@ -273,7 +280,7 @@ StorageResult StorageService::create_user(const UserProfile& profile) {
 
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
         tx.exec_params(R"SQL(
@@ -296,7 +303,7 @@ StorageResult StorageService::create_user(const UserProfile& profile) {
     }
 }
 
-StorageResult StorageService::upsert_user(const UserProfile& profile) {
+StorageResult StorageService::upsertUser(const UserProfile& profile) {
     if (profile.player_id.empty()) {
         return StorageResult{false, "player_id is empty"};
     }
@@ -306,7 +313,7 @@ StorageResult StorageService::upsert_user(const UserProfile& profile) {
 
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
         tx.exec_params(R"SQL(
@@ -341,9 +348,9 @@ StorageResult StorageService::upsert_user(const UserProfile& profile) {
     }
 }
 
-std::optional<UserProfile> StorageService::find_user(const std::string& player_id) const {
+std::optional<UserProfile> StorageService::findUser(const std::string& player_id) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    ensure_connected(impl_->connection);
+    ensureConnected(impl_->connection);
 
     pqxx::read_transaction tx(*impl_->connection);
     const auto rows = tx.exec_params(R"SQL(
@@ -365,13 +372,13 @@ std::optional<UserProfile> StorageService::find_user(const std::string& player_i
     profile.avatar_url = rows[0]["avatar_url"].as<std::string>();
     profile.role = rows[0]["role"].as<std::string>();
     profile.status = rows[0]["status"].as<std::string>();
-    profile.metadata = parse_json_or_empty(rows[0]["metadata"].as<std::string>());
+    profile.metadata = parseJsonOrEmpty(rows[0]["metadata"].as<std::string>());
     return profile;
 }
 
-std::optional<UserProfile> StorageService::find_user_by_account(const std::string& account) const {
+std::optional<UserProfile> StorageService::findUserByAccount(const std::string& account) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    ensure_connected(impl_->connection);
+    ensureConnected(impl_->connection);
 
     pqxx::read_transaction tx(*impl_->connection);
     const auto rows = tx.exec_params(R"SQL(
@@ -393,27 +400,184 @@ std::optional<UserProfile> StorageService::find_user_by_account(const std::strin
     profile.avatar_url = rows[0]["avatar_url"].as<std::string>();
     profile.role = rows[0]["role"].as<std::string>();
     profile.status = rows[0]["status"].as<std::string>();
-    profile.metadata = parse_json_or_empty(rows[0]["metadata"].as<std::string>());
+    profile.metadata = parseJsonOrEmpty(rows[0]["metadata"].as<std::string>());
     return profile;
 }
 
-InsertResult StorageService::append_answer_record(const AnswerRecord& record) {
+InsertResult StorageService::appendPlayerSession(const PlayerSessionRecord& record) {
     if (record.player_id.empty()) {
         return InsertResult{false, "player_id is empty", 0};
     }
 
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
+
+        pqxx::work tx(*impl_->connection);
+        const auto rows = tx.exec_params(R"SQL(
+            INSERT INTO rcs_player_sessions
+                (player_id, token_id, connection_id, client_ip, user_agent, metadata)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+            RETURNING id
+        )SQL",
+                                         record.player_id,
+                                         record.token_id,
+                                         static_cast<std::int64_t>(record.connection_id),
+                                         record.client_ip,
+                                         record.user_agent,
+                                         record.metadata.dump());
+        tx.commit();
+        return InsertResult{true, {}, rows[0][0].as<std::int64_t>()};
+    } catch (const std::exception& e) {
+        return InsertResult{false, e.what(), 0};
+    }
+}
+
+InsertResult StorageService::startCulturalInteraction(const CulturalInteractionRecord& record) {
+    if (record.player_id.empty()) {
+        return InsertResult{false, "player_id is empty", 0};
+    }
+
+    try {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        ensureConnected(impl_->connection);
+
+        pqxx::work tx(*impl_->connection);
+        const auto rows = tx.exec_params(R"SQL(
+            INSERT INTO rcs_cultural_interactions
+                (service_interaction_id, player_id, room_id, scene_id, trigger_id,
+                 interaction_type, ai_flow_id, topic, question, answer, explanation,
+                 navigation_text, audio_id, status, score, metadata)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                    NULLIF($13::text, ''), $14, $15, $16::jsonb)
+            RETURNING id
+        )SQL",
+                                         static_cast<std::int64_t>(record.service_interaction_id),
+                                         record.player_id,
+                                         static_cast<std::int64_t>(record.room_id),
+                                         record.scene_id,
+                                         record.trigger_id,
+                                         record.interaction_type,
+                                         static_cast<std::int64_t>(record.ai_flow_id),
+                                         record.topic,
+                                         record.question,
+                                         record.answer,
+                                         record.explanation,
+                                         record.navigation_text,
+                                         record.audio_id,
+                                         record.status,
+                                         record.score,
+                                         record.metadata.dump());
+        tx.commit();
+        return InsertResult{true, {}, rows[0][0].as<std::int64_t>()};
+    } catch (const std::exception& e) {
+        return InsertResult{false, e.what(), 0};
+    }
+}
+
+StorageResult StorageService::completeCulturalInteraction(const CulturalInteractionRecord& record) {
+    if (record.id <= 0) {
+        return StorageResult{false, "interaction database id is empty"};
+    }
+
+    try {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        ensureConnected(impl_->connection);
+
+        pqxx::work tx(*impl_->connection);
+        tx.exec_params(R"SQL(
+            UPDATE rcs_cultural_interactions
+            SET
+                answer = $2,
+                explanation = $3,
+                navigation_text = CASE WHEN $4 <> '' THEN $4 ELSE navigation_text END,
+                audio_id = NULLIF($5, ''),
+                status = $6,
+                score = $7,
+                metadata = metadata || $8::jsonb,
+                ai_flow_id = CASE WHEN $9::bigint <> 0 THEN $9::bigint ELSE ai_flow_id END,
+                answered_at = now(),
+                completed_at = CASE WHEN $6 = 'completed' THEN now() ELSE completed_at END
+            WHERE id = $1
+        )SQL",
+                       record.id,
+                       record.answer,
+                       record.explanation,
+                       record.navigation_text,
+                       record.audio_id,
+                       record.status,
+                       record.score,
+                       record.metadata.dump(),
+                       static_cast<std::int64_t>(record.ai_flow_id));
+        tx.commit();
+        return ok();
+    } catch (const std::exception& e) {
+        return fail(e);
+    }
+}
+
+StorageResult StorageService::saveTtsAudioResource(const TtsAudioResourceRecord& record) {
+    if (record.audio_id.empty()) {
+        return StorageResult{false, "audio_id is empty"};
+    }
+
+    try {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        ensureConnected(impl_->connection);
+
+        pqxx::work tx(*impl_->connection);
+        tx.exec_params(R"SQL(
+            INSERT INTO rcs_tts_audio_resources
+                (audio_id, player_id, interaction_id, mime_type, format, byte_size,
+                 duration_ms, storage_type, storage_uri, metadata)
+            VALUES ($1, NULLIF($2::text, ''), CASE WHEN $3::bigint = 0 THEN NULL ELSE $3::bigint END, $4, $5, $6,
+                    $7, $8, $9, $10::jsonb)
+            ON CONFLICT (audio_id) DO UPDATE SET
+                player_id = EXCLUDED.player_id,
+                interaction_id = EXCLUDED.interaction_id,
+                mime_type = EXCLUDED.mime_type,
+                format = EXCLUDED.format,
+                byte_size = EXCLUDED.byte_size,
+                duration_ms = EXCLUDED.duration_ms,
+                storage_type = EXCLUDED.storage_type,
+                storage_uri = EXCLUDED.storage_uri,
+                metadata = EXCLUDED.metadata
+        )SQL",
+                       record.audio_id,
+                       record.player_id,
+                       record.interaction_id,
+                       record.mime_type,
+                       record.format,
+                       record.byte_size,
+                       record.duration_ms,
+                       record.storage_type,
+                       record.storage_uri,
+                       record.metadata.dump());
+        tx.commit();
+        return ok();
+    } catch (const std::exception& e) {
+        return fail(e);
+    }
+}
+
+InsertResult StorageService::appendAnswerRecord(const AnswerRecord& record) {
+    if (record.player_id.empty()) {
+        return InsertResult{false, "player_id is empty", 0};
+    }
+
+    try {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
         const auto rows = tx.exec_params(R"SQL(
             INSERT INTO rcs_answer_records
-                (player_id, question_id, question, answer, correct, score, metadata)
-            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                (player_id, interaction_id, question_id, question, answer, correct, score, metadata)
+            VALUES ($1, CASE WHEN $2::bigint = 0 THEN NULL ELSE $2::bigint END, $3, $4, $5, $6, $7, $8::jsonb)
             RETURNING id
         )SQL",
                                          record.player_id,
+                                         record.interaction_id,
                                          record.question_id,
                                          record.question,
                                          record.answer,
@@ -427,13 +591,14 @@ InsertResult StorageService::append_answer_record(const AnswerRecord& record) {
     }
 }
 
-std::vector<AnswerRecord> StorageService::list_answer_records(const std::string& player_id, std::size_t limit) const {
+std::vector<AnswerRecord> StorageService::listAnswerRecords(const std::string& player_id, std::size_t limit) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    ensure_connected(impl_->connection);
+    ensureConnected(impl_->connection);
 
     pqxx::read_transaction tx(*impl_->connection);
     const auto rows = tx.exec_params(R"SQL(
-        SELECT id, player_id, question_id, question, answer, correct, score, metadata::text, created_at::text
+        SELECT id, COALESCE(interaction_id, 0) AS interaction_id, player_id, question_id, question,
+               answer, correct, score, metadata::text, created_at::text
         FROM rcs_answer_records
         WHERE player_id = $1
         ORDER BY created_at DESC
@@ -447,20 +612,21 @@ std::vector<AnswerRecord> StorageService::list_answer_records(const std::string&
     for (const auto& row : rows) {
         AnswerRecord record;
         record.id = row["id"].as<std::int64_t>();
+        record.interaction_id = row["interaction_id"].as<std::int64_t>();
         record.player_id = row["player_id"].as<std::string>();
         record.question_id = row["question_id"].as<std::string>();
         record.question = row["question"].as<std::string>();
         record.answer = row["answer"].as<std::string>();
         record.correct = row["correct"].as<bool>();
         record.score = row["score"].as<double>();
-        record.metadata = parse_json_or_empty(row["metadata"].as<std::string>());
+        record.metadata = parseJsonOrEmpty(row["metadata"].as<std::string>());
         record.created_at = row["created_at"].as<std::string>();
         records.push_back(std::move(record));
     }
     return records;
 }
 
-StorageResult StorageService::save_progress(const ProgressRecord& record) {
+StorageResult StorageService::saveProgress(const ProgressRecord& record) {
     if (record.player_id.empty()) {
         return StorageResult{false, "player_id is empty"};
     }
@@ -470,7 +636,7 @@ StorageResult StorageService::save_progress(const ProgressRecord& record) {
 
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
         tx.exec_params(R"SQL(
@@ -490,10 +656,10 @@ StorageResult StorageService::save_progress(const ProgressRecord& record) {
     }
 }
 
-std::optional<ProgressRecord> StorageService::load_progress(const std::string& player_id,
+std::optional<ProgressRecord> StorageService::loadProgress(const std::string& player_id,
                                                             const std::string& scene_id) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    ensure_connected(impl_->connection);
+    ensureConnected(impl_->connection);
 
     pqxx::read_transaction tx(*impl_->connection);
     const auto rows = tx.exec_params(R"SQL(
@@ -511,15 +677,15 @@ std::optional<ProgressRecord> StorageService::load_progress(const std::string& p
     ProgressRecord record;
     record.player_id = rows[0]["player_id"].as<std::string>();
     record.scene_id = rows[0]["scene_id"].as<std::string>();
-    record.progress = parse_json_or_empty(rows[0]["progress"].as<std::string>());
+    record.progress = parseJsonOrEmpty(rows[0]["progress"].as<std::string>());
     record.updated_at = rows[0]["updated_at"].as<std::string>();
     return record;
 }
 
-InsertResult StorageService::append_event_log(const EventLog& event) {
+InsertResult StorageService::appendEventLog(const EventLog& event) {
     try {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        ensure_connected(impl_->connection);
+        ensureConnected(impl_->connection);
 
         pqxx::work tx(*impl_->connection);
         const auto rows = tx.exec_params(R"SQL(
@@ -538,9 +704,9 @@ InsertResult StorageService::append_event_log(const EventLog& event) {
     }
 }
 
-std::vector<EventLog> StorageService::list_event_logs(std::size_t limit) const {
+std::vector<EventLog> StorageService::listEventLogs(std::size_t limit) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    ensure_connected(impl_->connection);
+    ensureConnected(impl_->connection);
 
     pqxx::read_transaction tx(*impl_->connection);
     const auto rows = tx.exec_params(R"SQL(
@@ -559,7 +725,7 @@ std::vector<EventLog> StorageService::list_event_logs(std::size_t limit) const {
         event.level = row["level"].as<std::string>();
         event.category = row["category"].as<std::string>();
         event.message = row["message"].as<std::string>();
-        event.metadata = parse_json_or_empty(row["metadata"].as<std::string>());
+        event.metadata = parseJsonOrEmpty(row["metadata"].as<std::string>());
         event.created_at = row["created_at"].as<std::string>();
         events.push_back(std::move(event));
     }

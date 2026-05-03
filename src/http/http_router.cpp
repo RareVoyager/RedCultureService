@@ -9,30 +9,30 @@
 
 namespace rcs::http {
 
-void HttpRouter::add_route(std::string method, std::string path, Handler handler)
+void HttpRouter::addRoute(std::string method, std::string path, Handler handler)
 {
     std::unique_lock lock(mutex_);
-    routes_[std::move(path)][normalize_method(std::move(method))] = std::move(handler);
+    routes_[std::move(path)][normalizeMethod(std::move(method))] = std::move(handler);
 }
 
 void HttpRouter::get(std::string path, Handler handler)
 {
-    add_route("GET", std::move(path), std::move(handler));
+    addRoute("GET", std::move(path), std::move(handler));
 }
 
 void HttpRouter::post(std::string path, Handler handler)
 {
-    add_route("POST", std::move(path), std::move(handler));
+    addRoute("POST", std::move(path), std::move(handler));
 }
 
 void HttpRouter::put(std::string path, Handler handler)
 {
-    add_route("PUT", std::move(path), std::move(handler));
+    addRoute("PUT", std::move(path), std::move(handler));
 }
 
 void HttpRouter::del(std::string path, Handler handler)
 {
-    add_route("DELETE", std::move(path), std::move(handler));
+    addRoute("DELETE", std::move(path), std::move(handler));
 }
 
 HttpResponse HttpRouter::route(const HttpRequest& request) const
@@ -47,10 +47,10 @@ HttpResponse HttpRouter::route(const HttpRequest& request) const
                      request.method,
                      request.path,
                      request.target);
-        return HttpResponse::not_found();
+        return HttpResponse::notFound();
     }
 
-    const auto method = normalize_method(request.method);
+    const auto method = normalizeMethod(request.method);
     const auto handler_it = path_it->second.find(method);
     if (handler_it == path_it->second.end()) {
         spdlog::warn("http_method_not_allowed location={}:{} method={} path={} target={}",
@@ -65,7 +65,7 @@ HttpResponse HttpRouter::route(const HttpRequest& request) const
     return handler_it->second(request);
 }
 
-bool HttpRouter::has_route(const std::string& method, const std::string& path) const
+bool HttpRouter::hasRoute(const std::string& method, const std::string& path) const
 {
     std::shared_lock lock(mutex_);
     const auto path_it = routes_.find(path);
@@ -73,10 +73,10 @@ bool HttpRouter::has_route(const std::string& method, const std::string& path) c
         return false;
     }
 
-    return path_it->second.find(normalize_method(method)) != path_it->second.end();
+    return path_it->second.find(normalizeMethod(method)) != path_it->second.end();
 }
 
-std::string HttpRouter::normalize_method(std::string method)
+std::string HttpRouter::normalizeMethod(std::string method)
 {
     std::transform(method.begin(), method.end(), method.begin(), [](unsigned char ch) {
         return static_cast<char>(std::toupper(ch));

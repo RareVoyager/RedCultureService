@@ -5,7 +5,7 @@
 
 namespace {
 
-std::string read_connection_uri() {
+std::string readConnectionUri() {
     const char* env = std::getenv("RCS_POSTGRES_URI");
     if (env && *env) {
         return env;
@@ -18,7 +18,7 @@ std::string read_connection_uri() {
 
 int main() {
     rcs::storage::StorageConfig config;
-    config.connection_uri = read_connection_uri();
+    config.connection_uri = readConnectionUri();
     config.auto_migrate = true;
 
     rcs::storage::StorageService storage(config);
@@ -36,7 +36,7 @@ int main() {
     user.display_name = "Demo Player";
     user.metadata = {{"source", "storage_example"}};
 
-    const auto user_result = storage.upsert_user(user);
+    const auto user_result = storage.upsertUser(user);
     if (!user_result.ok) {
         std::cout << "upsert user failed: " << user_result.error << '\n';
         return 1;
@@ -46,12 +46,12 @@ int main() {
     answer.player_id = user.player_id;
     answer.question_id = "q-001";
     answer.question = "遵义会议的重要意义是什么？";
-    answer.answer = "它在关键时刻挽救了革命。";
+    answer.answer = "它在关键时刻挽救了革命?";
     answer.correct = true;
     answer.score = 95.0;
     answer.metadata = {{"scene_id", "museum-hall"}};
 
-    const auto answer_result = storage.append_answer_record(answer);
+    const auto answer_result = storage.appendAnswerRecord(answer);
     if (!answer_result.ok) {
         std::cout << "append answer failed: " << answer_result.error << '\n';
         return 1;
@@ -61,25 +61,25 @@ int main() {
     progress.player_id = user.player_id;
     progress.scene_id = "museum-hall";
     progress.progress = {{"chapter", 1}, {"completed", true}};
-    storage.save_progress(progress);
+    storage.saveProgress(progress);
 
     rcs::storage::EventLog event;
     event.level = "info";
     event.category = "storage_example";
     event.message = "storage module example completed";
     event.metadata = {{"player_id", user.player_id}};
-    storage.append_event_log(event);
+    storage.appendEventLog(event);
 
-    const auto loaded_user = storage.find_user(user.player_id);
-    const auto records = storage.list_answer_records(user.player_id);
-    const auto loaded_progress = storage.load_progress(user.player_id, progress.scene_id);
+    const auto loaded_user = storage.findUser(user.player_id);
+    const auto records = storage.listAnswerRecords(user.player_id);
+    const auto loaded_progress = storage.loadProgress(user.player_id, progress.scene_id);
 
     std::cout << "connected: true\n";
     std::cout << "user: " << (loaded_user ? loaded_user->display_name : "<missing>") << '\n';
     std::cout << "answer id: " << answer_result.id << '\n';
     std::cout << "answer records: " << records.size() << '\n';
     std::cout << "progress loaded: " << (loaded_progress ? "true" : "false") << '\n';
-    std::cout << "event logs: " << storage.list_event_logs(10).size() << '\n';
+    std::cout << "event logs: " << storage.listEventLogs(10).size() << '\n';
 
     storage.disconnect();
     return 0;

@@ -3,10 +3,10 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-    const std::filesystem::path config_path = argc > 1 ? argv[1] : "app.yaml";
+    const std::filesystem::path configPath = argc > 1 ? argv[1] : "app.yaml";
 
-    rcs::config_hotreload::ConfigHotReloadService config_service(config_path);
-    config_service.set_on_reload([](const rcs::config_hotreload::AppConfig& config) {
+    rcs::config_hotreload::ConfigHotReloadService config_service(configPath);
+    config_service.setOnReload([](const rcs::config_hotreload::AppConfig& config) {
         std::cout << "config reloaded: "
                   << "network=" << config.network.listen_address << ':' << config.network.port
                   << ", ai_model=" << config.ai.model

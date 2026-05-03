@@ -124,9 +124,11 @@ struct AiOrchestratorConfig {
     std::chrono::milliseconds retry_backoff{std::chrono::milliseconds(500)};
     std::size_t max_queued_tasks{1024};
     std::string default_question_prompt{
-        "请围绕主题 {topic} 为玩家 {player_id} 生成一道互动题目。场景：{scene_id}。"};
+        "请围绕主??{topic} 为玩??{player_id} 生成一道互动题目。场景：{scene_id}??"
+        };
     std::string default_explanation_prompt{
-        "请根据题目和玩家答案给出讲解。题目：{metadata.question}。玩家答案：{user_input}。"};
+        "请根据题目和玩家答案给出讲解。题目：{metadata.question}。玩家答案：{user_input}??"
+        };
 };
 
 struct FlowResult {
@@ -161,29 +163,29 @@ public:
                                    AiOrchestratorConfig config = {});
 
     const AiOrchestratorConfig& config() const noexcept;
-    void set_client(std::shared_ptr<IAiClient> client);
+    void setClient(std::shared_ptr<IAiClient> client);
 
-    bool register_trigger_rule(const TriggerRule& rule);
-    bool remove_trigger_rule(const std::string& rule_id);
-    std::vector<AiTask> handle_trigger_event(const TriggerEvent& event);
+    bool registerTriggerRule(const TriggerRule& rule);
+    bool removeTriggerRule(const std::string& rule_id);
+    std::vector<AiTask> handleTriggerEvent(const TriggerEvent& event);
 
-    FlowResult start_question_flow(AiContext context,
+    FlowResult startQuestionFlow(AiContext context,
                                    std::string question_prompt_template = {},
                                    std::string explanation_prompt_template = {});
-    FlowResult submit_answer(AiFlowId flow_id, std::string answer);
+    FlowResult submitAnswer(AiFlowId flow_id, std::string answer);
 
-    EnqueueResult enqueue_task(AiTaskKind kind, AiContext context, std::string prompt_template = {});
-    bool cancel_task(AiTaskId task_id);
+    EnqueueResult enqueueTask(AiTaskKind kind, AiContext context, std::string prompt_template = {});
+    bool cancelTask(AiTaskId task_id);
 
     TickResult tick(std::size_t max_tasks = 1);
 
-    std::optional<AiTask> find_task(AiTaskId task_id) const;
-    std::optional<AiInteractionFlow> find_flow(AiFlowId flow_id) const;
-    std::vector<AiTask> list_tasks() const;
-    std::vector<AiInteractionFlow> list_flows() const;
+    std::optional<AiTask> findTask(AiTaskId task_id) const;
+    std::optional<AiInteractionFlow> findFlow(AiFlowId flow_id) const;
+    std::vector<AiTask> listTasks() const;
+    std::vector<AiInteractionFlow> listFlows() const;
 
-    std::size_t queued_task_count() const;
-    std::size_t flow_count() const;
+    std::size_t queuedTaskCount() const;
+    std::size_t flowCount() const;
 
 private:
     struct RunningTask {
@@ -191,19 +193,19 @@ private:
         AiRequest request;
     };
 
-    EnqueueResult enqueue_task_locked(AiTaskKind kind,
+    EnqueueResult enqueueTaskLocked(AiTaskKind kind,
                                       AiContext context,
                                       std::string prompt_template,
                                       std::optional<AiFlowId> flow_id);
-    std::optional<RunningTask> take_next_task_locked(std::chrono::steady_clock::time_point now);
-    AiTask finish_task_locked(const RunningTask& running,
+    std::optional<RunningTask> takeNextTaskLocked(std::chrono::steady_clock::time_point now);
+    AiTask finishTaskLocked(const RunningTask& running,
                               AiResponse response,
                               std::chrono::milliseconds elapsed,
                               TickResult& result);
-    void update_flow_after_task_locked(const AiTask& task);
-    bool rule_matches_event(const TriggerRule& rule, const TriggerEvent& event) const;
-    std::string render_prompt(const std::string& prompt_template, const AiContext& context) const;
-    std::string trigger_cooldown_key(const TriggerRule& rule, const TriggerEvent& event) const;
+    void updateFlowAfterTaskLocked(const AiTask& task);
+    bool ruleMatchesEvent(const TriggerRule& rule, const TriggerEvent& event) const;
+    std::string renderPrompt(const std::string& prompt_template, const AiContext& context) const;
+    std::string triggerCooldownKey(const TriggerRule& rule, const TriggerEvent& event) const;
 
     AiOrchestratorConfig config_;
     std::shared_ptr<IAiClient> client_;
@@ -216,9 +218,9 @@ private:
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> last_triggered_at_;
 };
 
-const char* to_string(TriggerType type);
-const char* to_string(AiTaskKind kind);
-const char* to_string(AiTaskStatus status);
-const char* to_string(AiFlowStage stage);
+const char* toString(TriggerType type);
+const char* toString(AiTaskKind kind);
+const char* toString(AiTaskStatus status);
+const char* toString(AiFlowStage stage);
 
 } // namespace rcs::ai_orchestrator

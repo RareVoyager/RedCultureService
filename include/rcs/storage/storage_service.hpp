@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -42,6 +42,7 @@ struct UserProfile {
 
 struct AnswerRecord {
     std::int64_t id{0};
+    std::int64_t interaction_id{0};
     std::string player_id;
     std::string question_id;
     std::string question;
@@ -68,6 +69,49 @@ struct EventLog {
     std::string created_at;
 };
 
+struct PlayerSessionRecord {
+    std::int64_t id{0};
+    std::string player_id;
+    std::string token_id;
+    std::uint64_t connection_id{0};
+    std::string client_ip;
+    std::string user_agent;
+    nlohmann::json metadata = nlohmann::json::object();
+};
+
+struct CulturalInteractionRecord {
+    std::int64_t id{0};
+    std::uint64_t service_interaction_id{0};
+    std::string player_id;
+    std::uint64_t room_id{0};
+    std::string scene_id;
+    std::string trigger_id;
+    std::string interaction_type{"qa"};
+    std::uint64_t ai_flow_id{0};
+    std::string topic;
+    std::string question;
+    std::string answer;
+    std::string explanation;
+    std::string navigation_text;
+    std::string audio_id;
+    std::string status{"started"};
+    double score{0.0};
+    nlohmann::json metadata = nlohmann::json::object();
+};
+
+struct TtsAudioResourceRecord {
+    std::string audio_id;
+    std::string player_id;
+    std::int64_t interaction_id{0};
+    std::string mime_type{"audio/mpeg"};
+    std::string format{"mp3"};
+    std::int64_t byte_size{0};
+    std::int64_t duration_ms{0};
+    std::string storage_type{"memory"};
+    std::string storage_uri;
+    nlohmann::json metadata = nlohmann::json::object();
+};
+
 class StorageService {
 public:
     explicit StorageService(StorageConfig config = {});
@@ -82,24 +126,29 @@ public:
 
     StorageResult connect();
     void disconnect();
-    bool is_connected() const;
+    bool isConnected() const;
 
     // 创建 PostgreSQL 基础表结构，支持重复执行。
     StorageResult migrate();
 
-    StorageResult create_user(const UserProfile& profile);
-    StorageResult upsert_user(const UserProfile& profile);
-    std::optional<UserProfile> find_user(const std::string& player_id) const;
-    std::optional<UserProfile> find_user_by_account(const std::string& account) const;
+    StorageResult createUser(const UserProfile& profile);
+    StorageResult upsertUser(const UserProfile& profile);
+    std::optional<UserProfile> findUser(const std::string& player_id) const;
+    std::optional<UserProfile> findUserByAccount(const std::string& account) const;
 
-    InsertResult append_answer_record(const AnswerRecord& record);
-    std::vector<AnswerRecord> list_answer_records(const std::string& player_id, std::size_t limit = 50) const;
+    InsertResult appendPlayerSession(const PlayerSessionRecord& record);
+    InsertResult startCulturalInteraction(const CulturalInteractionRecord& record);
+    StorageResult completeCulturalInteraction(const CulturalInteractionRecord& record);
+    StorageResult saveTtsAudioResource(const TtsAudioResourceRecord& record);
 
-    StorageResult save_progress(const ProgressRecord& record);
-    std::optional<ProgressRecord> load_progress(const std::string& player_id, const std::string& scene_id) const;
+    InsertResult appendAnswerRecord(const AnswerRecord& record);
+    std::vector<AnswerRecord> listAnswerRecords(const std::string& player_id, std::size_t limit = 50) const;
 
-    InsertResult append_event_log(const EventLog& event);
-    std::vector<EventLog> list_event_logs(std::size_t limit = 100) const;
+    StorageResult saveProgress(const ProgressRecord& record);
+    std::optional<ProgressRecord> loadProgress(const std::string& player_id, const std::string& scene_id) const;
+
+    InsertResult appendEventLog(const EventLog& event);
+    std::vector<EventLog> listEventLogs(std::size_t limit = 100) const;
 
 private:
     struct Impl;

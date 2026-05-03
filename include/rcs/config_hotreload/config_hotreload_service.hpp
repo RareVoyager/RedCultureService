@@ -19,18 +19,36 @@ struct NetworkConfig {
     std::uint32_t max_messages_per_window{120};
 };
 
+struct ServerConfig {
+    std::string listen_address{"0.0.0.0"};
+    std::uint16_t port{8080};
+    std::uint32_t thread_count{2};
+    std::uint32_t max_body_bytes{1024 * 1024};
+    bool enable_cors{true};
+};
+
+struct RuntimeConfig {
+    std::string service_name{"red_culture_service"};
+    std::string version{"0.1.0"};
+    std::string environment{"local"};
+    bool allow_dev_auth{true};
+};
+
 struct AuthConfig {
     std::string issuer{"red-culture-service"};
     std::string audience{"unity-client"};
+    std::string jwt_secret{"local-dev-secret"};
     std::string jwt_secret_env{"RCS_JWT_SECRET"};
     std::uint32_t token_ttl_seconds{7200};
     std::uint32_t session_idle_timeout_seconds{1800};
 };
 
 struct StorageConfig {
+    bool enabled{false};
     std::string postgres_uri_env{"RCS_POSTGRES_URI"};
     std::string postgres_uri{"postgresql://postgres:postgres@127.0.0.1:5432/redculture"};
     bool auto_migrate{true};
+    bool allow_without_storage{true};
 };
 
 struct AiConfig {
@@ -58,12 +76,26 @@ struct HotReloadConfig {
     std::uint32_t check_interval_ms{1000};
 };
 
+struct LoggingConfig {
+    std::string service_name{"red_culture_service"};
+    std::string logger_name{"redculture"};
+    std::string level{"info"};
+    bool console{true};
+    bool json{false};
+    bool file_enabled{false};
+    std::string file_path{"logs/redculture_server.log"};
+    std::string pattern{"[%Y-%m-%d %H:%M:%S.%e] [%n] [%^%l%$] %v"};
+};
+
 struct AppConfig {
+    RuntimeConfig app;
+    ServerConfig server;
     NetworkConfig network;
     AuthConfig auth;
     StorageConfig storage;
     AiConfig ai;
     VoiceTtsConfig voice_tts;
+    LoggingConfig logging;
     HotReloadConfig hot_reload;
     std::unordered_map<std::string, std::string> raw_overrides;
 };
@@ -78,10 +110,10 @@ class ConfigHotReloadService {
 public:
     using ReloadCallback = std::function<void(const AppConfig&)>;
 
-    explicit ConfigHotReloadService(std::filesystem::path config_path = "config/app.yaml");
+    explicit ConfigHotReloadService(std::filesystem::path configPath = "config/app.yaml");
 
-    const std::filesystem::path& config_path() const noexcept;
-    void set_config_path(std::filesystem::path config_path);
+    const std::filesystem::path& configPath() const noexcept;
+    void setConfigPath(std::filesystem::path configPath);
 
     ConfigLoadResult load();
 
@@ -91,17 +123,17 @@ public:
     // 检查文件修改时间；只有配置文件变化时才重新加载并触发回调。
     ConfigLoadResult poll();
 
-    std::optional<AppConfig> current_config() const;
-    void set_on_reload(ReloadCallback callback);
+    std::optional<AppConfig> currentConfig() const;
+    void setOnReload(ReloadCallback callback);
 
-    std::chrono::milliseconds check_interval() const;
-    bool hot_reload_enabled() const;
+    std::chrono::milliseconds checkInterval() const;
+    bool hotReloadEnabled() const;
 
-    std::optional<std::string> resolve_env(const std::string& env_name) const;
-    std::string resolve_env_or(const std::string& env_name, std::string fallback) const;
+    std::optional<std::string> resolveEnv(const std::string& env_name) const;
+    std::string resolveEnvOr(const std::string& env_name, std::string fallback) const;
 
 private:
-    ConfigLoadResult load_locked(bool force);
+    ConfigLoadResult loadLocked(bool force);
 
     mutable std::mutex mutex_;
     std::filesystem::path config_path_;

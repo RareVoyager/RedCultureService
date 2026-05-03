@@ -12,15 +12,15 @@ struct User {
     std::string name;
 };
 
-void test_success_without_data()
+void testSuccessWithoutData()
 {
     auto result = Result<int>::success();
 
-    std::cout << "test_success_without_data\n";
+    std::cout << "testSuccessWithoutData\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
-    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "hasData = " << result.hasData() << '\n';
 
     try {
         int value = result.data();
@@ -32,43 +32,43 @@ void test_success_without_data()
     std::cout << "------------------------\n";
 }
 
-void test_success_with_int_data()
+void testSuccessWithIntData()
 {
     auto result = Result<int>::success(100);
 
-    std::cout << "test_success_with_int_data\n";
+    std::cout << "testSuccessWithIntData\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
-    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "hasData = " << result.hasData() << '\n';
     std::cout << "data = " << result.data() << '\n';
 
     std::cout << "------------------------\n";
 }
 
-void test_success_with_msg_and_data()
+void testSuccessWithMsgAndData()
 {
     auto result = Result<int>::success("query user count success", 10);
 
-    std::cout << "test_success_with_msg_and_data\n";
+    std::cout << "testSuccessWithMsgAndData\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
-    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "hasData = " << result.hasData() << '\n';
     std::cout << "data = " << result.data() << '\n';
 
     std::cout << "------------------------\n";
 }
 
-void test_error()
+void testError()
 {
     auto result = Result<int>::error("database connection failed");
 
-    std::cout << "test_error\n";
+    std::cout << "testError\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
-    std::cout << "has_data = " << result.has_data() << '\n';
+    std::cout << "hasData = " << result.hasData() << '\n';
 
     if (!result) {
         std::cout << "result is false\n";
@@ -77,11 +77,11 @@ void test_error()
     std::cout << "------------------------\n";
 }
 
-void test_error_with_custom_code()
+void testErrorWithCustomCode()
 {
     auto result = Result<int>::error(404, "user not found");
 
-    std::cout << "test_error_with_custom_code\n";
+    std::cout << "testErrorWithCustomCode\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
@@ -89,11 +89,11 @@ void test_error_with_custom_code()
     std::cout << "------------------------\n";
 }
 
-void test_void_result()
+void testVoidResult()
 {
     auto result = Result<void>::success("delete success");
 
-    std::cout << "test_void_result\n";
+    std::cout << "testVoidResult\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
@@ -101,31 +101,31 @@ void test_void_result()
     std::cout << "------------------------\n";
 }
 
-void test_string_result()
+void testStringResult()
 {
     auto result1 = Result<std::string>::success("hello");
 
-    std::cout << "test_string_result\n";
+    std::cout << "testStringResult\n";
     std::cout << "result1.code = " << result1.code() << '\n';
     std::cout << "result1.msg = " << result1.msg() << '\n';
     std::cout << "result1.data = " << result1.data() << '\n';
 
-    auto result2 = Result<std::string>::success_msg("only change success message");
+    auto result2 = Result<std::string>::successMsg("only change success message");
 
     std::cout << "result2.code = " << result2.code() << '\n';
     std::cout << "result2.msg = " << result2.msg() << '\n';
-    std::cout << "result2.has_data = " << result2.has_data() << '\n';
+    std::cout << "result2.hasData = " << result2.hasData() << '\n';
 
     std::cout << "------------------------\n";
 }
 
-void test_vector_result()
+void testVectorResult()
 {
     std::vector<int> nums{1, 2, 3, 4, 5};
 
     auto result = Result<std::vector<int>>::success("query list success", nums);
 
-    std::cout << "test_vector_result\n";
+    std::cout << "testVectorResult\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
@@ -139,13 +139,13 @@ void test_vector_result()
     std::cout << "------------------------\n";
 }
 
-void test_custom_struct_result()
+void testCustomStructResult()
 {
     User user{1, "chenanqi"};
 
     auto result = Result<User>::success("query user success", user);
 
-    std::cout << "test_custom_struct_result\n";
+    std::cout << "testCustomStructResult\n";
     std::cout << "code = " << result.code() << '\n';
     std::cout << "msg = " << result.msg() << '\n';
     std::cout << "ok = " << result.ok() << '\n';
@@ -157,15 +157,15 @@ void test_custom_struct_result()
 
 int main()
 {
-    test_success_without_data();
-    test_success_with_int_data();
-    test_success_with_msg_and_data();
-    test_error();
-    test_error_with_custom_code();
-    test_void_result();
-    test_string_result();
-    test_vector_result();
-    test_custom_struct_result();
+    testSuccessWithoutData();
+    testSuccessWithIntData();
+    testSuccessWithMsgAndData();
+    testError();
+    testErrorWithCustomCode();
+    testVoidResult();
+    testStringResult();
+    testVectorResult();
+    testCustomStructResult();
 
     return 0;
 }

@@ -22,7 +22,7 @@ enum class ServiceStatus {
 };
 
 struct OpsConfig {
-    std::string service_name{"red_culture_service"};
+    std::string serviceName{"red_culture_service"};
     std::string version{"0.1.0"};
     std::string environment{"local"};
     std::string instance_id{"local-instance"};
@@ -32,7 +32,7 @@ struct OpsConfig {
 };
 
 struct VersionInfo {
-    std::string service_name;
+    std::string serviceName;
     std::string version;
     std::string environment;
     std::string instance_id;
@@ -77,41 +77,41 @@ public:
     explicit OpsService(OpsConfig config = {});
 
     const OpsConfig& config() const noexcept;
-    VersionInfo version_info() const;
+    VersionInfo versionInfo() const;
 
     void start();
-    void set_ready(bool ready);
-    void mark_unhealthy(std::string reason);
-    void begin_shutdown(std::string reason);
-    void complete_shutdown();
+    void setReady(bool ready);
+    void markUnhealthy(std::string reason);
+    void beginShutdown(std::string reason);
+    void completeShutdown();
 
-    bool is_ready() const;
-    bool is_shutting_down() const;
+    bool isReady() const;
+    bool isShuttingDown() const;
     ServiceStatus status() const;
-    std::optional<std::string> shutdown_reason() const;
+    std::optional<std::string> shutdownReason() const;
 
-    bool register_health_check(std::string component, HealthCheck check);
-    bool unregister_health_check(const std::string& component);
-    void set_metrics_exporter(MetricsExporter exporter);
-    void set_shutdown_callback(ShutdownCallback callback);
+    bool registerHealthCheck(std::string component, HealthCheck check);
+    bool unregisterHealthCheck(const std::string& component);
+    void setMetricsExporter(MetricsExporter exporter);
+    void setShutdownCallback(ShutdownCallback callback);
 
-    HealthReport collect_health_report() const;
+    HealthReport collectHealthReport() const;
 
-    // 处理基础管理接口。真实 HTTP/gRPC 服务可以把请求转为 AdminRequest 后调用这里。
-    AdminResponse handle_request(const AdminRequest& request);
+    // 处理基础管理接口，HTTP/gRPC 服务可以把请求转换成 AdminRequest 后调用这里。
+    AdminResponse handleRequest(const AdminRequest& request);
 
-    AdminResponse health_response() const;
-    AdminResponse ready_response() const;
-    AdminResponse version_response() const;
-    AdminResponse metrics_response() const;
-    AdminResponse shutdown_response(std::string reason);
+    AdminResponse healthResponse() const;
+    AdminResponse readyResponse() const;
+    AdminResponse versionResponse() const;
+    AdminResponse metricsResponse() const;
+    AdminResponse shutdownResponse(std::string reason);
 
 private:
-    std::vector<HealthCheck> health_checks_snapshot() const;
-    std::string health_report_json(const HealthReport& report) const;
-    std::string version_json() const;
-    AdminResponse json_response(int status_code, std::string body) const;
-    AdminResponse text_response(int status_code, std::string body, std::string content_type = "text/plain") const;
+    std::vector<HealthCheck> healthChecksSnapshot() const;
+    std::string healthReportJson(const HealthReport& report) const;
+    std::string versionJson() const;
+    AdminResponse jsonResponse(int status_code, std::string body) const;
+    AdminResponse textResponse(int status_code, std::string body, std::string content_type = "text/plain") const;
 
     OpsConfig config_;
     std::chrono::system_clock::time_point started_at_;
@@ -126,6 +126,6 @@ private:
     ShutdownCallback shutdown_callback_;
 };
 
-const char* to_string(ServiceStatus status);
+const char* toString(ServiceStatus status);
 
 } // namespace rcs::ops

@@ -20,7 +20,7 @@ struct HttpServerConfig {
     // 单个请求体最大字节数，避免错误客户端发送过大的 JSON。
     std::size_t max_body_bytes{1024 * 1024};
 
-    // Unity WebGL 需要 CORS；桌面/移动端 Unity 不需要，但打开后更利于统一联调。
+    // Unity WebGL 需要 CORS；桌面和移动端 Unity 不需要，但打开后更利于统一联调。
     bool enable_cors{true};
 };
 
@@ -35,7 +35,7 @@ public:
 
     void start();
     void stop();
-    bool is_running() const;
+    bool isRunning() const;
 
 private:
     class Impl;

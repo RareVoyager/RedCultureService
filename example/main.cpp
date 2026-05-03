@@ -3,6 +3,6 @@
 #include "rcs/common/service.hpp"
 
 int main() {
-    std::cout << "Hello from " << rcs::common::service_name() << '\n';
+    std::cout << "Hello from " << rcs::common::serviceName() << '\n';
     return 0;
 }

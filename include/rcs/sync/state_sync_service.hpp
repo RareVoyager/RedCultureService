@@ -99,28 +99,28 @@ public:
 
     const SyncConfig& config() const noexcept;
 
-    bool register_room(RoomId room_id);
-    bool unregister_room(RoomId room_id);
+    bool registerRoom(RoomId room_id);
+    bool unregisterRoom(RoomId room_id);
 
-    StateSubmitResult add_player(RoomId room_id,
-                                 std::string player_id,
-                                 std::uint64_t connection_id,
-                                 PlayerTransform initial_transform = {});
-    bool remove_player(RoomId room_id, const std::string& player_id);
-    bool mark_player_offline(RoomId room_id, const std::string& player_id);
+    StateSubmitResult addPlayer(RoomId room_id,
+                                std::string player_id,
+                                std::uint64_t connection_id,
+                                PlayerTransform initial_transform = {});
+    bool removePlayer(RoomId room_id, const std::string& player_id);
+    bool markPlayerOffline(RoomId room_id, const std::string& player_id);
 
     // 提交客户端状态。通过校验后，服务端状态会被更新并生成一条增量。
-    StateSubmitResult submit_state(const StateInput& input);
+    StateSubmitResult submitState(const StateInput& input);
 
-    std::optional<PlayerState> find_player_state(RoomId room_id, const std::string& player_id) const;
-    std::optional<StateSnapshot> build_snapshot(RoomId room_id) const;
-    std::vector<StateSnapshot> build_due_snapshots();
+    std::optional<PlayerState> findPlayerState(RoomId room_id, const std::string& player_id) const;
+    std::optional<StateSnapshot> buildSnapshot(RoomId room_id) const;
+    std::vector<StateSnapshot> buildDueSnapshots();
 
     // 取出并清空房间待广播增量。
-    std::vector<StateDelta> drain_deltas(RoomId room_id);
+    std::vector<StateDelta> drainDeltas(RoomId room_id);
 
-    std::size_t room_count() const;
-    std::size_t player_count(RoomId room_id) const;
+    std::size_t roomCount() const;
+    std::size_t playerCount(RoomId room_id) const;
 
 private:
     struct RoomSyncState {
@@ -132,10 +132,10 @@ private:
 
     StateSubmitResult reject(std::string error) const;
     StateSubmitResult accept(RoomSyncState& room, PlayerState& state, const StateInput& input);
-    bool is_movement_allowed(const PlayerState& current,
-                             const PlayerTransform& next,
-                             std::chrono::steady_clock::time_point now) const;
-    StateSnapshot build_snapshot_locked(RoomId room_id, const RoomSyncState& room) const;
+    bool isMovementAllowed(const PlayerState& current,
+                           const PlayerTransform& next,
+                           std::chrono::steady_clock::time_point now) const;
+    StateSnapshot buildSnapshotLocked(RoomId room_id, const RoomSyncState& room) const;
 
     SyncConfig config_;
     mutable std::mutex mutex_;
