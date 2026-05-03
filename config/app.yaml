@@ -1,24 +1,57 @@
+# RedCultureService 本地开发配置
+# 启动时 redculture_server 会先加载本文件，再允许环境变量和命令行参数覆盖。
+# conan install . -of build/conan -s build_type=Debug -s compiler.cppstd=17 --build=missing
+app:
+  service_name: "red_culture_service"
+  version: "0.1.0"
+  environment: "local"
+  # 本地联调可直接用 player_id 登录；生产环境建议改为 false 或启动时传 --prod-auth。
+  allow_dev_auth: true
+
+server:
+  listen_address: "0.0.0.0"
+  port: 8080
+  thread_count: 2
+  max_body_bytes: 1048576
+  enable_cors: true
+
+logging:
+  service_name: "red_culture_service"
+  logger_name: "redculture"
+  level: "info"
+  console: true
+  json: false
+  file_enabled: true
+  file_path: "logs/redculture_server.log"
+  pattern: "[%Y-%m-%d %H:%M:%S.%e] [%n] [%^%l%$] %v"
+
+auth:
+  issuer: "red-culture-service"
+  audience: "unity-client"
+  # 本地默认密钥只用于开发；生产环境请设置 RCS_JWT_SECRET 覆盖。
+  jwt_secret: "local-dev-secret"
+  jwt_secret_env: "RCS_JWT_SECRET"
+  token_ttl_seconds: 7200
+  session_idle_timeout_seconds: 1800
+
+storage:
+  enabled: true
+  postgres_uri_env: "RCS_POSTGRES_URI"
+  postgres_uri: "postgresql://postgres:123456@127.0.0.1:5432/redculture"
+  auto_migrate: true
+  # 本地联调时数据库异常不阻断部分互动流程；注册/密码登录仍然强依赖数据库。
+  allow_without_storage: true
+
+# TCP 长连接接入层预留配置。当前 Unity HTTP 联调主要使用 server 段。
 network:
   listen_address: "0.0.0.0"
   port: 7000
   max_connections: 4096
   max_messages_per_window: 120
 
-auth:
-  issuer: "red-culture-service"
-  audience: "unity-client"
-  jwt_secret_env: "RCS_JWT_SECRET"
-  token_ttl_seconds: 7200
-  session_idle_timeout_seconds: 1800
-
-storage:
-  postgres_uri_env: "RCS_POSTGRES_URI"
-  postgres_uri: "postgresql://postgres:postgres@127.0.0.1:5432/redculture"
-  auto_migrate: true
-
 ai:
-  provider: "openai"
-  base_url: "https://api.openai.com/v1"
+  provider: "mock"
+  base_url: ""
   api_key_env: "OPENAI_API_KEY"
   model: "gpt-4.1-mini"
   timeout_ms: 8000

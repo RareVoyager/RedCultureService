@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS rcs_player_sessions (
 
 CREATE TABLE IF NOT EXISTS rcs_cultural_interactions (
     id BIGSERIAL PRIMARY KEY,
+    service_interaction_id BIGINT NOT NULL DEFAULT 0,
     player_id TEXT NOT NULL REFERENCES rcs_users(player_id) ON DELETE CASCADE,
+    room_id BIGINT NOT NULL DEFAULT 0,
     scene_id TEXT NOT NULL DEFAULT '',
     trigger_id TEXT NOT NULL DEFAULT '',
     interaction_type TEXT NOT NULL DEFAULT 'qa',
@@ -62,6 +64,8 @@ CREATE TABLE IF NOT EXISTS rcs_cultural_interactions (
 );
 
 ALTER TABLE rcs_cultural_interactions
+    ADD COLUMN IF NOT EXISTS service_interaction_id BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS room_id BIGINT NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS interaction_type TEXT NOT NULL DEFAULT 'qa',
     ADD COLUMN IF NOT EXISTS navigation_text TEXT NOT NULL DEFAULT '';
 
@@ -128,6 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_rcs_sessions_token
 
 CREATE INDEX IF NOT EXISTS idx_rcs_interactions_player_started
     ON rcs_cultural_interactions(player_id, started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_rcs_interactions_service_id
+    ON rcs_cultural_interactions(service_interaction_id);
 
 CREATE INDEX IF NOT EXISTS idx_rcs_interactions_scene_trigger
     ON rcs_cultural_interactions(scene_id, trigger_id, started_at DESC);
